@@ -25,7 +25,7 @@ class GameViewModel: ObservableObject {
     
     // MARK: - Constants
     
-    let colors: [Color] = [
+    private let colors: [Color] = [
         .blue, .red, .green, .orange, .purple, .pink,
         .yellow, .cyan, .mint, .indigo, .teal, .brown
     ]
@@ -124,25 +124,34 @@ class GameViewModel: ObservableObject {
     ///   - idx1: Index of the first card
     ///   - idx2: Index of the second card
     private func checkForMatch(idx1: Int, idx2: Int) {
-        guard idx1 < cards.count && idx2 < cards.count else { return }
+        guard idx1 >= 0, idx2 >= 0,
+              idx1 < cards.count,
+              idx2 < cards.count else { return }
         
         if cards[idx1].colorIndex == cards[idx2].colorIndex {
             // Match found
-            cards[idx1].isMatched = true
-            cards[idx2].isMatched = true
+            withAnimation {
+                cards[idx1].isMatched = true
+                cards[idx2].isMatched = true
+            }
             matchesFound += 1
             firstIndex = nil
             checkWin()
         } else {
             // No match - flip cards back after a delay
+            // Store card IDs to safely reference them after the delay
+            let card1ID = cards[idx1].id
+            let card2ID = cards[idx2].id
             isBusy = true
+            
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 guard let self = self else { return }
                 withAnimation {
-                    if idx1 < self.cards.count {
+                    // Find cards by ID to handle potential array modifications
+                    if let idx1 = self.cards.firstIndex(where: { $0.id == card1ID }) {
                         self.cards[idx1].isFlipped = false
                     }
-                    if idx2 < self.cards.count {
+                    if let idx2 = self.cards.firstIndex(where: { $0.id == card2ID }) {
                         self.cards[idx2].isFlipped = false
                     }
                 }
