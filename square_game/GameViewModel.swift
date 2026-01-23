@@ -1,0 +1,249 @@
+import SwiftUI
+import Combine
+
+class GameViewModel: ObservableObject {
+    // MARK: - Published Properties
+    @Published var cards: [Card] = []
+    @Published var gameState: GameState = .menu
+    @Published var stats: GameStats = GameStats()
+    @Published var levelConfig: LevelConfig = LevelConfig(level: 1)
+    @Published var showNameInput: Bool = false
+    
+    // MARK: - Private Properties
+    private var firstSelectedIndex: Int? = nil
+    private var isBusy: Bool = false
+    private var timer: AnyCancellable?
+    
+    let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .yellow, .cyan]
+    let gridSize = 3
+    
+    // MARK: - Game Setup
+    func startNewGame(level: Int = 1) {
+        stats.currentLevel = level
+        levelConfig = LevelConfig(level: level)
+        setupCards()
+        stats.reset()
+        
+        if levelConfig.mode == .time {
+            stats.timeRemaining = levelConfig.maxTime ?? 30
+        }
+        
+        // Start peeking phase
+        gameState = .peeking
+        flipAllCards(true)
+        
+        // After 3 seconds, flip back and start game
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.flipAllCards(false)
+            self?.gameState = .playing
+            
+            // Start timer if in time mode
+            if self?.levelConfig.mode == .time {
+                self?.startTimer()
+            }
+        }
+    }
+    
+    private func setupCards() {
+        let totalCells = gridSize * gridSize
+        let pairCount = totalCells / 2
+        var newCards: [Card] = []
+        
+        // Create pairs
+        for i in 0..<pairCount {
+            newCards.append(Card(colorIndex: i % colors.count))
+            newCards.append(Card(colorIndex: i % colors.count))
+        }
+        
+        newCards.shuffle()
+        
+        // Insert bonus card in center for odd grids
+        if totalCells % 2 != 0 {
+            let bonusCard = Card(colorIndex: -1, isFlipped: true, isMatched: true, isBonus: true)
+            newCards.insert(bonusCard, at: totalCells / 2)
+        }
+        
+        cards = newCards
+        firstSelectedIndex = nil
+    }
+    
+    private func flipAllCards(_ flipped: Bool) {
+        for i in 0..<cards.count {
+            if !cards[i].isBonus {
+                cards[i].isFlipped = flipped
+            }
+        }
+    }
+    
+    // MARK: - Timer
+    private func startTimer() {
+        timer?.cancel()
+        timer = Timer.publish(every: 1.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                if self.stats.timeRemaining > 0 {
+                    self.stats.timeRemaining -= 1
+                } else {
+                    self.handleTimeOut()
+                }
+            }
+    }
+    
+    private func stopTimer() {
+        timer?.cancel()
+        timer = nil
+    }
+    
+    // MARK: - Card Tap Handler
+    func handleCardTap(at index: Int) {
+        guard gameState == .playing,
+              !isBusy,
+              !cards[index].isFlipped,
+              !cards[index].isMatched,
+              !cards[index].isBonus else { return }
+        
+        withAnimation(.spring(response: 0.3)) {
+            cards[index].isFlipped = true
+        }
+        
+        if let firstIndex = firstSelectedIndex {
+            // Second card selected
+            stats.turns += 1
+            checkForMatch(first: firstIndex, second: index)
+        } else {
+            // First card selected
+            firstSelectedIndex = index
+        }
+    }
+    
+    private func checkForMatch(first: Int, second: Int) {
+        if cards[first].colorIndex == cards[second].colorIndex {
+            // Match found
+            cards[first].isMatched = true
+            cards[second].isMatched = true
+            stats.matchesFound += 1
+            firstSelectedIndex = nil
+            
+            checkWinCondition()
+        } else {
+            // No match - flip back after delay
+            isBusy = true
+            firstSelectedIndex = nil
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self = self else { return }
+                withAnimation(.spring(response: 0.3)) {
+                    self.cards[first].isFlipped = false
+                    self.cards[second].isFlipped = false
+                }
+                self.isBusy = false
+                self.checkLossCondition()
+            }
+        }
+    }
+    
+    // MARK: - Win/Loss Conditions
+    private func checkWinCondition() {
+        let totalPairs = (gridSize * gridSize) / 2
+        if stats.matchesFound == totalPairs {
+            stopTimer()
+            calculateScore()
+            gameState = .won
+        }
+    }
+    
+    private func checkLossCondition() {
+        if levelConfig.mode == .score {
+            if let maxTurns = levelConfig.maxTurns, stats.turns >= maxTurns {
+                handleGameOver()
+            }
+        }
+    }
+    
+    private func handleTimeOut() {
+        stopTimer()
+        handleGameOver()
+    }
+    
+    private func handleGameOver() {
+        if stats.bonusLives > 0 {
+            // Use bonus life
+            stats.bonusLives -= 1
+            
+            if levelConfig.mode == .score {
+                // Grant 2 extra turns
+                if let maxTurns = levelConfig.maxTurns {
+                    levelConfig = LevelConfig(level: stats.currentLevel)
+                    // Temporarily increase max turns
+                    stats.turns = maxTurns - 2
+                }
+            } else {
+                // Grant 10 extra seconds
+                stats.timeRemaining = 10
+                startTimer()
+            }
+        } else {
+            stopTimer()
+            calculateScore()
+            gameState = .lost
+        }
+    }
+    
+    // MARK: - Scoring
+    private func calculateScore() {
+        let baseScore = stats.matchesFound * 100
+        var bonus = 0
+        
+        if levelConfig.mode == .score {
+            // Bonus for efficient turns
+            if let maxTurns = levelConfig.maxTurns {
+                let minTurns = (gridSize * gridSize) / 2
+                let turnsUsed = stats.turns
+                if turnsUsed == minTurns {
+                    bonus += 200 // Perfect game
+                } else if turnsUsed < maxTurns {
+                    bonus += (maxTurns - turnsUsed) * 20
+                }
+            }
+        } else {
+            // Bonus for remaining time
+            bonus += stats.timeRemaining * 10
+        }
+        
+        // Level multiplier
+        let levelBonus = stats.currentLevel * 50
+        
+        stats.totalScore = baseScore + bonus + levelBonus
+    }
+    
+    // MARK: - Level Progression
+    func advanceToNextLevel() {
+        stats.currentLevel += 1
+        stats.bonusLives = 1 // Reset bonus life for new level
+        startNewGame(level: stats.currentLevel)
+    }
+    
+    func restartCurrentLevel() {
+        stats.bonusLives = 1
+        startNewGame(level: stats.currentLevel)
+    }
+    
+    func returnToMenu() {
+        stopTimer()
+        gameState = .menu
+        stats = GameStats()
+        cards = []
+    }
+    
+    // MARK: - Mode Selection
+    func startInMode(_ mode: GameMode) {
+        switch mode {
+        case .score:
+            startNewGame(level: 1)
+        case .time:
+            startNewGame(level: 6)
+        }
+    }
+}

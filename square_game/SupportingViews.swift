@@ -1,0 +1,321 @@
+import SwiftUI
+
+struct HighScoresView: View {
+    @ObservedObject var highScoreManager: HighScoreManager
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.3), Color.blue.opacity(0.3)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack {
+                    if highScoreManager.highScores.isEmpty {
+                        emptyState
+                    } else {
+                        scoresList
+                    }
+                }
+            }
+            .navigationTitle("🏆 High Scores")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                
+                if !highScoreManager.highScores.isEmpty {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Clear All", role: .destructive) {
+                            highScoreManager.clearAllScores()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    var emptyState: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "trophy.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.gray)
+            
+            Text("No High Scores Yet")
+                .font(.title2).bold()
+            
+            Text("Play some games to see your scores here!")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+    }
+    
+    var scoresList: some View {
+        List {
+            ForEach(Array(highScoreManager.highScores.enumerated()), id: \.element.id) { index, entry in
+                HighScoreRow(entry: entry, rank: index + 1)
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(rowColor(for: index))
+                            .padding(.vertical, 2)
+                    )
+            }
+        }
+        .listStyle(.plain)
+    }
+    
+    func rowColor(for index: Int) -> Color {
+        switch index {
+        case 0: return Color.yellow.opacity(0.3)
+        case 1: return Color.gray.opacity(0.3)
+        case 2: return Color.orange.opacity(0.3)
+        default: return Color.white.opacity(0.5)
+        }
+    }
+}
+
+struct HighScoreRow: View {
+    let entry: HighScoreEntry
+    let rank: Int
+    
+    var body: some View {
+        HStack {
+            // Rank
+            Text("\(rank)")
+                .font(.title2).bold()
+                .foregroundColor(rankColor)
+                .frame(width: 40)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.playerName)
+                    .font(.headline)
+                
+                HStack {
+                    Text("Level \(entry.level)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text("•")
+                        .foregroundColor(.secondary)
+                    
+                    Text(entry.date, style: .date)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            // Score
+            VStack(alignment: .trailing) {
+                Text("\(entry.score)")
+                    .font(.title3).bold()
+                    .foregroundColor(.blue)
+                
+                Text("points")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    
+    var rankColor: Color {
+        switch rank {
+        case 1: return .yellow
+        case 2: return .gray
+        case 3: return .orange
+        default: return .blue
+        }
+    }
+}
+
+struct InfoView: View {
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                LinearGradient(
+                    colors: [Color.blue.opacity(0.3), Color.green.opacity(0.3)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 25) {
+                        headerSection
+                        
+                        gameplaySection
+                        
+                        peekingSection
+                        
+                        modesSection
+                        
+                        bonusLivesSection
+                        
+                        scoringSection
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("📖 How to Play")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    var headerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Welcome to Memory Color Match!")
+                .font(.title2).bold()
+            
+            Text("Test your memory by matching colored cards in this classic puzzle game.")
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white.opacity(0.8))
+        )
+    }
+    
+    var gameplaySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Basic Gameplay", systemImage: "gamecontroller.fill")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                bulletPoint("Match all pairs of colored cards on a 3×3 grid")
+                bulletPoint("The center card is a bonus square (🌟) - already matched")
+                bulletPoint("Tap two cards to reveal their colors")
+                bulletPoint("If they match, they stay visible")
+                bulletPoint("If not, they flip back after a short delay")
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white.opacity(0.8))
+        )
+    }
+    
+    var peekingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Peeking Feature", systemImage: "eye.fill")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                bulletPoint("At the start of each level, all cards flip over for 3 seconds")
+                bulletPoint("Use this time to memorize the card positions")
+                bulletPoint("After 3 seconds, cards flip back and the game begins")
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white.opacity(0.8))
+        )
+    }
+    
+    var modesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Game Modes", systemImage: "list.bullet")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Score Mode (Levels 1-5)")
+                        .font(.subheadline).bold()
+                    bulletPoint("Limited number of turns to find all matches")
+                    bulletPoint("Level 1: 10 turns, Level 2: 8 turns, Level 3: 6 turns")
+                    bulletPoint("Level 4: 5 turns, Level 5: 4 turns")
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Time Mode (Level 6+)")
+                        .font(.subheadline).bold()
+                    bulletPoint("Find all matches before the timer runs out")
+                    bulletPoint("30 seconds per level")
+                    bulletPoint("Race against the clock!")
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white.opacity(0.8))
+        )
+    }
+    
+    var bonusLivesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Bonus Lives 🌟", systemImage: "star.fill")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                bulletPoint("Each level starts with 1 bonus life")
+                bulletPoint("If you run out of turns/time, the life is used automatically")
+                bulletPoint("Score Mode: Grants 2 extra turns")
+                bulletPoint("Time Mode: Grants 10 extra seconds")
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white.opacity(0.8))
+        )
+    }
+    
+    var scoringSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Scoring System", systemImage: "number.circle.fill")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                bulletPoint("Base: 100 points per match")
+                bulletPoint("Bonus for unused turns in Score Mode")
+                bulletPoint("Bonus for remaining time in Time Mode")
+                bulletPoint("Level multiplier: 50 points × level number")
+                bulletPoint("Perfect game (minimum turns): 200 point bonus!")
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.white.opacity(0.8))
+        )
+    }
+    
+    func bulletPoint(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .font(.body)
+            Text(text)
+                .font(.body)
+        }
+    }
+}
+
+#Preview {
+    InfoView()
+}

@@ -1,187 +1,194 @@
 import SwiftUI
 
-// STEP 1: Define the Card structure
-struct Card: Identifiable {
-    let id = UUID()
-    let colorIndex: Int
-    var isFlipped: Bool = false
-    var isMatched: Bool = false
-    var isBonus: Bool = false
-}
-
 struct ContentView: View {
-    // --- STATE VARIABLES ---
-    @State private var cards: [Card] = []
-    @State private var firstIndex: Int? = nil
-    @State private var turns: Int = 0
-    @State private var matchesFound: Int = 0
-    @State private var size: Int = 4 // Default
-    @State private var gameID = UUID() // Prevents the crash
-    @State private var isBusy: Bool = false
-    @State private var winMessage: String = ""
-
-    let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .yellow, .cyan, .mint, .indigo, .teal, .brown]
-
-    var body: some View {
-        VStack {
-            // STEP 2: Header showing Score and Turns
-            gameHeader
-            
-            // STEP 3: The Game Grid
-            if cards.isEmpty {
-                menuView
-            } else {
-                gameGridView
-                    .id(gameID) // Forces a fresh draw to avoid "Index out of range"
-                
-                if !winMessage.isEmpty {
-                    winOverlay
-                }
-                
-                Button("Exit to Menu") { cards = [] }
-                    .padding().foregroundColor(.red)
-            }
-        }
-    }
-
-    // --- UI SUB-VIEWS ---
-
-    var menuView: some View {
-        VStack(spacing: 20) {
-            Text("Memory Match").font(.largeTitle).bold()
-            Button("Easy (3x3)") { setupGame(3) }
-            Button("Medium (5x5)") { setupGame(5) }
-            Button("Hard (7x7)") { setupGame(7) }
-        }.buttonStyle(.borderedProminent)
-    }
-
-    var gameHeader: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("Turns: \(turns)").font(.headline)
-                Text("Min Turns Needed: \( (size * size) / 2 )").font(.caption)
-            }
-            Spacer()
-            Text("Score: \(calculateScore())").font(.title2).bold()
-        }.padding()
-    }
-
-    var gameGridView: some View {
-        let columns = Array(repeating: GridItem(.flexible()), count: size)
-        return LazyVGrid(columns: columns, spacing: 10) {
-            ForEach(cards) { card in
-                CardView(card: card, color: card.colorIndex == -1 ? .clear : colors[card.colorIndex % colors.count])
-                    .onTapGesture {
-                        if let idx = cards.firstIndex(where: { $0.id == card.id }) {
-                            handleTap(at: idx)
-                        }
-                    }
-            }
-        }.padding()
-    }
-
-    var winOverlay: some View {
-        VStack {
-            Text(winMessage)
-                .font(.largeTitle).bold()
-                .foregroundColor(winMessage.contains("GREAT") ? .green : .blue)
-            Text("Final Score: \(calculateScore())")
-        }.padding().background(RoundedRectangle(cornerRadius: 20).fill(Color.white).shadow(radius: 10))
-    }
-
-    // --- GAME LOGIC ---
-
-    func setupGame(_ newSize: Int) {
-        size = newSize
-        turns = 0
-        matchesFound = 0
-        firstIndex = nil
-        winMessage = ""
-        
-        let total = size * size
-        let pairCount = total / 2
-        var newCards: [Card] = []
-
-        for i in 0..<pairCount {
-            newCards.append(Card(colorIndex: i))
-            newCards.append(Card(colorIndex: i))
-        }
-        newCards.shuffle()
-
-        // Handle the middle square for odd grids (3x3, 5x5, 7x7)
-        if total % 2 != 0 {
-            newCards.insert(Card(colorIndex: -1, isFlipped: true, isMatched: true, isBonus: true), at: total / 2)
-        }
-        
-        cards = newCards
-        gameID = UUID() // Refresh the view identity
-    }
-
-    func handleTap(at index: Int) {
-        guard !isBusy, !cards[index].isFlipped, !cards[index].isMatched else { return }
-
-        withAnimation { cards[index].isFlipped = true }
-
-        if let second = firstIndex {
-            turns += 1
-            checkForMatch(idx1: second, idx2: index)
-        } else {
-            firstIndex = index
-        }
-    }
-
-    func checkForMatch(idx1: Int, idx2: Int) {
-        if cards[idx1].colorIndex == cards[idx2].colorIndex {
-            matchesFound += 1
-            firstIndex = nil
-            checkWin()
-        } else {
-            isBusy = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                withAnimation {
-                    cards[idx1].isFlipped = false
-                    cards[idx2].isFlipped = false
-                }
-                firstIndex = nil
-                isBusy = false
-            }
-        }
-    }
-
-    func calculateScore() -> Int {
-        let minTurns = (size * size) / 2
-        let penalty = max(0, (turns - minTurns) * 10)
-        return (matchesFound * 20) - penalty
-    }
-
-    func checkWin() {
-        let totalPairs = (size * size) / 2
-        if matchesFound == totalPairs {
-            let minTurns = totalPairs
-            if turns == minTurns {
-                winMessage = "⭐ GREAT WIN! ⭐"
-            } else {
-                winMessage = "General Win"
-            }
-        }
-    }
-}
-
-// Separate UI component for the Card
-struct CardView: View {
-    let card: Card
-    let color: Color
+    @StateObject private var viewModel = GameViewModel()
+    @StateObject private var highScoreManager = HighScoreManager()
+    
+    @State private var showHighScores = false
+    @State private var showInfo = false
+    
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(card.isFlipped || card.isMatched ? color : Color.gray)
-            if !card.isFlipped && !card.isMatched {
-                Text("?").foregroundColor(.white)
-            } else if card.isBonus {
-                Text("🌟")
+            if viewModel.gameState == .menu {
+                mainMenu
+            } else {
+                GameView(viewModel: viewModel, highScoreManager: highScoreManager)
             }
         }
-        .aspectRatio(1, contentMode: .fit)
-        .opacity(card.isMatched && !card.isBonus ? 0.3 : 1)
+        .sheet(isPresented: $showHighScores) {
+            HighScoresView(highScoreManager: highScoreManager)
+        }
+        .sheet(isPresented: $showInfo) {
+            InfoView()
+        }
     }
+    
+    var mainMenu: some View {
+        ZStack {
+            // Background gradient
+            LinearGradient(
+                colors: [
+                    Color.blue.opacity(0.6),
+                    Color.purple.opacity(0.6),
+                    Color.pink.opacity(0.4)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            VStack(spacing: 30) {
+                Spacer()
+                
+                // Title
+                VStack(spacing: 10) {
+                    Text("🧠")
+                        .font(.system(size: 80))
+                    
+                    Text("Memory Color Match")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
+                    
+                    Text("Test Your Memory!")
+                        .font(.title3)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+                
+                Spacer()
+                
+                // Menu buttons
+                VStack(spacing: 20) {
+                    MenuButton(
+                        icon: "play.circle.fill",
+                        title: "Start Game",
+                        subtitle: "Begin Level 1",
+                        color: .green
+                    ) {
+                        viewModel.startNewGame(level: 1)
+                    }
+                    
+                    MenuButton(
+                        icon: "list.bullet.circle.fill",
+                        title: "Select Mode",
+                        subtitle: "Choose Score or Time Mode",
+                        color: .blue
+                    ) {
+                        // Show mode selection
+                    }
+                    .overlay(
+                        HStack(spacing: 15) {
+                            Button(action: {
+                                viewModel.startInMode(.score)
+                            }) {
+                                VStack {
+                                    Image(systemName: "number.circle.fill")
+                                        .font(.title2)
+                                    Text("Score")
+                                        .font(.caption)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue.opacity(0.8))
+                                .cornerRadius(10)
+                            }
+                            
+                            Button(action: {
+                                viewModel.startInMode(.time)
+                            }) {
+                                VStack {
+                                    Image(systemName: "timer.circle.fill")
+                                        .font(.title2)
+                                    Text("Time")
+                                        .font(.caption)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.orange.opacity(0.8))
+                                .cornerRadius(10)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 60)
+                    )
+                    
+                    MenuButton(
+                        icon: "trophy.circle.fill",
+                        title: "High Scores",
+                        subtitle: "View Top Players",
+                        color: .orange
+                    ) {
+                        showHighScores = true
+                    }
+                    
+                    MenuButton(
+                        icon: "info.circle.fill",
+                        title: "How to Play",
+                        subtitle: "Learn the Rules",
+                        color: .purple
+                    ) {
+                        showInfo = true
+                    }
+                }
+                .padding(.horizontal, 30)
+                
+                Spacer()
+                
+                // Footer
+                Text("Made with ❤️ in SwiftUI")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.bottom, 20)
+            }
+        }
+    }
+}
+
+// MARK: - Menu Button Component
+struct MenuButton: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 15) {
+                Image(systemName: icon)
+                    .font(.system(size: 32))
+                    .foregroundColor(.white)
+                    .frame(width: 50)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(color.gradient)
+                    .shadow(color: color.opacity(0.5), radius: 8, x: 0, y: 4)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+#Preview {
+    ContentView()
 }
