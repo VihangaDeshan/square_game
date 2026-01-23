@@ -70,24 +70,6 @@ struct LevelConfig {
     static let perfectTurns = 4
 }
 
-
-// MARK: - High Score Entry
-struct HighScoreEntry: Codable, Identifiable {
-    let id: UUID
-    let playerName: String
-    let score: Int
-    let level: Int
-    let date: Date
-    
-    init(playerName: String, score: Int, level: Int) {
-        self.id = UUID()
-        self.playerName = playerName
-        self.score = score
-        self.level = level
-        self.date = Date()
-    }
-}
-
 // MARK: - Game Stats
 struct GameStats {
     var turns: Int = 0

@@ -360,17 +360,10 @@ struct NameInputView: View {
             
             Button("Save") {
                 let name = playerName.isEmpty ? "Player" : playerName
-                
-                // FIXED: Creating the entry with all required fields including 'date'
-                let entry = HighScoreEntry(
-                    playerName: name,
-                    score: currentScore,
-                    level: currentLevel,
-                    date: Date()
+                highScoreManager.saveLastPlayerName(name)
+                highScoreManager.saveHighScore(
+                    HighScoreEntry(playerName: name, score: currentScore, level: currentLevel, date: Date())
                 )
-                
-                // Use the manager directly (no $) to call functions
-                highScoreManager.saveHighScore(entry)
                 onComplete()
             }
             .buttonStyle(.borderedProminent)
