@@ -15,17 +15,20 @@ class GameViewModel: ObservableObject {
     private var isBusy: Bool = false
     private var timer: AnyCancellable?
     
-    let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .yellow, .cyan]
-    let gridSize = 3
+    let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .yellow, .cyan, .mint, .indigo, .teal, .brown]
+    
+    var gridSize: Int {
+        return levelConfig.gridSize
+    }
     
     // MARK: - Game Setup
-    func startNewGame(level: Int = 1) {
+    func startNewGame(level: Int = 1, mode: GameMode? = nil) {
         stats.currentLevel = level
-        levelConfig = LevelConfig(level: level)
+        levelConfig = LevelConfig(level: level, mode: mode)
         setupCards()
         stats.reset()
         
-        if levelConfig.mode == .time {
+        if levelConfig.mode == .time || levelConfig.mode == .difficult {
             stats.timeRemaining = levelConfig.maxTime ?? 30
         }
         
@@ -38,8 +41,8 @@ class GameViewModel: ObservableObject {
             self?.flipAllCards(false)
             self?.gameState = .playing
             
-            // Start timer if in time mode
-            if self?.levelConfig.mode == .time {
+            // Start timer if in time or difficult mode
+            if self?.levelConfig.mode == .time || self?.levelConfig.mode == .difficult {
                 self?.startTimer()
             }
         }
@@ -127,6 +130,11 @@ class GameViewModel: ObservableObject {
             stats.matchesFound += 1
             firstSelectedIndex = nil
             
+            // In difficult mode, shuffle remaining card colors after each match
+            if levelConfig.mode == .difficult {
+                shuffleRemainingColors()
+            }
+            
             checkWinCondition()
         } else {
             // No match - flip back after delay
@@ -141,6 +149,37 @@ class GameViewModel: ObservableObject {
                 }
                 self.isBusy = false
                 self.checkLossCondition()
+            }
+        }
+    }
+    
+    // MARK: - Difficult Mode: Shuffle Remaining Colors
+    private func shuffleRemainingColors() {
+        stats.colorShuffles += 1
+        
+        // Get all unmatched, non-bonus cards
+        var unmatchedIndices: [Int] = []
+        for i in 0..<cards.count {
+            if !cards[i].isMatched && !cards[i].isBonus {
+                unmatchedIndices.append(i)
+            }
+        }
+        
+        // Extract their color indices
+        var colorIndices = unmatchedIndices.map { cards[$0].colorIndex }
+        
+        // Shuffle the colors
+        colorIndices.shuffle()
+        
+        // Reassign shuffled colors with animation
+        withAnimation(.easeInOut(duration: 0.5)) {
+            for (index, cardIndex) in unmatchedIndices.enumerated() {
+                cards[cardIndex] = Card(
+                    colorIndex: colorIndices[index],
+                    isFlipped: cards[cardIndex].isFlipped,
+                    isMatched: cards[cardIndex].isMatched,
+                    isBonus: cards[cardIndex].isBonus
+                )
             }
         }
     }
@@ -231,12 +270,14 @@ class GameViewModel: ObservableObject {
     func advanceToNextLevel() {
         stats.currentLevel += 1
         stats.bonusLives = 1 // Reset bonus life for new level
-        startNewGame(level: stats.currentLevel)
+        let currentMode = levelConfig.mode
+        startNewGame(level: stats.currentLevel, mode: currentMode)
     }
     
     func restartCurrentLevel() {
         stats.bonusLives = 1
-        startNewGame(level: stats.currentLevel)
+        let currentMode = levelConfig.mode
+        startNewGame(level: stats.currentLevel, mode: currentMode)
     }
     
     func returnToMenu() {
@@ -250,9 +291,11 @@ class GameViewModel: ObservableObject {
     func startInMode(_ mode: GameMode) {
         switch mode {
         case .score:
-            startNewGame(level: 1)
+            startNewGame(level: 1, mode: .score)
         case .time:
-            startNewGame(level: 8) // Time mode starts at level 8
+            startNewGame(level: 1, mode: .time)
+        case .difficult:
+            startNewGame(level: 1, mode: .difficult)
         }
     }
 }

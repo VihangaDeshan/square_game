@@ -82,13 +82,14 @@ struct ContentView: View {
                         }
                         .padding(.horizontal)
                         
+                        // Row 1: Score and Time
                         HStack(spacing: 12) {
                             Button(action: {
                                 viewModel.startInMode(.score)
                             }) {
                                 VStack(spacing: 8) {
                                     Image(systemName: "number.circle.fill")
-                                        .font(.system(size: 32))
+                                        .font(.system(size: 28))
                                     Text("Score")
                                         .font(.subheadline)
                                         .bold()
@@ -97,7 +98,7 @@ struct ContentView: View {
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .padding(.vertical, 14)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(Color.blue.gradient)
@@ -110,22 +111,58 @@ struct ContentView: View {
                             }) {
                                 VStack(spacing: 8) {
                                     Image(systemName: "timer.circle.fill")
-                                        .font(.system(size: 32))
+                                        .font(.system(size: 28))
                                     Text("Time")
                                         .font(.subheadline)
                                         .bold()
-                                    Text("Level 8+")
+                                    Text("30 sec/level")
                                         .font(.caption2)
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .padding(.vertical, 14)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(Color.orange.gradient)
                                         .shadow(color: Color.orange.opacity(0.5), radius: 5, x: 0, y: 3)
                                 )
                             }
+                        }
+                        
+                        // Row 2: Difficult Mode (full width)
+                        Button(action: {
+                            viewModel.startInMode(.difficult)
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "flame.circle.fill")
+                                    .font(.system(size: 28))
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Difficult Mode")
+                                        .font(.subheadline)
+                                        .bold()
+                                    Text("Expanding grid • Colors shuffle after match")
+                                        .font(.caption2)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.red, Color.purple],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .shadow(color: Color.red.opacity(0.5), radius: 5, x: 0, y: 3)
+                            )
                         }
                     }
                     .padding()
