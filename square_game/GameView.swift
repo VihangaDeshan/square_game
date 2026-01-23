@@ -271,14 +271,13 @@ struct GameView: View {
     }
 }
 
-// MARK: - Card Flip View with 3D Animation
+// MARK: - Card Flip View
 struct CardFlipView: View {
     let card: Card
     let color: Color
     
     var body: some View {
         ZStack {
-            // Back of card (gray with ?)
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.gradient)
                 .overlay(
@@ -288,7 +287,6 @@ struct CardFlipView: View {
                 )
                 .opacity(card.isFlipped || card.isMatched ? 0 : 1)
             
-            // Front of card (colored)
             RoundedRectangle(cornerRadius: 12)
                 .fill(color.gradient)
                 .overlay(
@@ -345,10 +343,17 @@ struct NameInputView: View {
             
             Button("Save") {
                 let name = playerName.isEmpty ? "Player" : playerName
-                highScoreManager.saveLastPlayerName(name)
-                highScoreManager.saveHighScore(
-                    HighScoreEntry(playerName: name, score: currentScore, level: currentLevel)
+                
+                // FIXED: Creating the entry with all required fields including 'date'
+                let entry = HighScoreEntry(
+                    playerName: name,
+                    score: currentScore,
+                    level: currentLevel,
+                    date: Date()
                 )
+                
+                // Use the manager directly (no $) to call functions
+                highScoreManager.saveHighScore(entry)
                 onComplete()
             }
             .buttonStyle(.borderedProminent)

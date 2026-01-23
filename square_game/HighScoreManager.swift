@@ -1,4 +1,15 @@
 import Foundation
+import SwiftUI
+import Combine
+
+// DEFINE THIS ONLY ONCE HERE
+struct HighScoreEntry: Identifiable, Codable {
+    var id = UUID()
+    let playerName: String
+    let score: Int
+    let level: Int // Added level to match your game logic
+    let date: Date
+}
 
 class HighScoreManager: ObservableObject {
     @Published var highScores: [HighScoreEntry] = []
@@ -10,7 +21,6 @@ class HighScoreManager: ObservableObject {
         loadHighScores()
     }
     
-    // MARK: - Load/Save
     func loadHighScores() {
         if let data = UserDefaults.standard.data(forKey: highScoresKey),
            let decoded = try? JSONDecoder().decode([HighScoreEntry].self, from: data) {
@@ -18,15 +28,20 @@ class HighScoreManager: ObservableObject {
         }
     }
     
+    // Updated to accept the Entry object directly to match your View's call
     func saveHighScore(_ entry: HighScoreEntry) {
         highScores.append(entry)
         highScores.sort { $0.score > $1.score }
         
-        // Keep only top 10
         if highScores.count > 10 {
             highScores = Array(highScores.prefix(10))
         }
         
+        saveToDisk()
+        saveLastPlayerName(entry.playerName)
+    }
+    
+    private func saveToDisk() {
         if let encoded = try? JSONEncoder().encode(highScores) {
             UserDefaults.standard.set(encoded, forKey: highScoresKey)
         }
@@ -41,9 +56,7 @@ class HighScoreManager: ObservableObject {
     }
     
     func isHighScore(_ score: Int) -> Bool {
-        if highScores.count < 10 {
-            return true
-        }
+        if highScores.count < 10 { return true }
         return score > (highScores.last?.score ?? 0)
     }
     
