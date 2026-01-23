@@ -69,51 +69,71 @@ struct ContentView: View {
                         viewModel.startNewGame(level: 1)
                     }
                     
-                    MenuButton(
-                        icon: "list.bullet.circle.fill",
-                        title: "Select Mode",
-                        subtitle: "Choose Score or Time Mode",
-                        color: .blue
-                    ) {
-                        // Show mode selection
-                    }
-                    .overlay(
-                        HStack(spacing: 15) {
+                    // Mode Selection Section
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "list.bullet.circle.fill")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                            Text("Select Mode")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        
+                        HStack(spacing: 12) {
                             Button(action: {
                                 viewModel.startInMode(.score)
                             }) {
-                                VStack {
+                                VStack(spacing: 8) {
                                     Image(systemName: "number.circle.fill")
-                                        .font(.title2)
+                                        .font(.system(size: 32))
                                     Text("Score")
-                                        .font(.caption)
+                                        .font(.subheadline)
+                                        .bold()
+                                    Text("Levels 1-7")
+                                        .font(.caption2)
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue.opacity(0.8))
-                                .cornerRadius(10)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.blue.gradient)
+                                        .shadow(color: Color.blue.opacity(0.5), radius: 5, x: 0, y: 3)
+                                )
                             }
                             
                             Button(action: {
                                 viewModel.startInMode(.time)
                             }) {
-                                VStack {
+                                VStack(spacing: 8) {
                                     Image(systemName: "timer.circle.fill")
-                                        .font(.title2)
+                                        .font(.system(size: 32))
                                     Text("Time")
-                                        .font(.caption)
+                                        .font(.subheadline)
+                                        .bold()
+                                    Text("Level 8+")
+                                        .font(.caption2)
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.orange.opacity(0.8))
-                                .cornerRadius(10)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.orange.gradient)
+                                        .shadow(color: Color.orange.opacity(0.5), radius: 5, x: 0, y: 3)
+                                )
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 60)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 15)
+                            .fill(Color.white.opacity(0.15))
                     )
+                    .padding(.horizontal, 30)
                     
                     MenuButton(
                         icon: "trophy.circle.fill",
