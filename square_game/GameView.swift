@@ -61,9 +61,20 @@ struct GameView: View {
                 VStack(alignment: .leading) {
                     Text("Level \(viewModel.stats.currentLevel)")
                         .font(.title2).bold()
-                    Text(viewModel.levelConfig.mode.description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Text(viewModel.levelConfig.mode.description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        if viewModel.levelConfig.mode == .difficult {
+                            Text("•")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(viewModel.gridSize)×\(viewModel.gridSize)")
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                                .bold()
+                        }
+                    }
                 }
                 
                 Spacer()
@@ -71,7 +82,8 @@ struct GameView: View {
                 VStack(alignment: .trailing) {
                     Text("Lives: \(String(repeating: "🌟", count: viewModel.stats.bonusLives))")
                         .font(.headline)
-                    Text("Matches: \(viewModel.stats.matchesFound)/4")
+                    let totalPairs = (viewModel.gridSize * viewModel.gridSize) / 2
+                    Text("Matches: \(viewModel.stats.matchesFound)/\(totalPairs)")
                         .font(.caption)
                 }
             }
@@ -100,6 +112,19 @@ struct GameView: View {
                 }
                 
                 Spacer()
+                
+                if viewModel.levelConfig.mode == .difficult {
+                    VStack {
+                        Text("Shuffles")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(viewModel.stats.colorShuffles)")
+                            .font(.title3).bold()
+                            .foregroundColor(.purple)
+                    }
+                    
+                    Spacer()
+                }
                 
                 VStack {
                     Text("Score")
