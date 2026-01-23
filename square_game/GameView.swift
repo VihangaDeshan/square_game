@@ -202,6 +202,7 @@ struct GameView: View {
             HStack(spacing: 20) {
                 Button("Next Level") {
                     if highScoreManager.isHighScore(viewModel.stats.totalScore) {
+                        viewModel.shouldAdvanceAfterNameInput = true
                         viewModel.showNameInput = true
                     } else {
                         viewModel.advanceToNextLevel()
@@ -211,6 +212,7 @@ struct GameView: View {
                 
                 Button("Menu") {
                     if highScoreManager.isHighScore(viewModel.stats.totalScore) {
+                        viewModel.shouldAdvanceAfterNameInput = false
                         viewModel.showNameInput = true
                     } else {
                         viewModel.returnToMenu()
@@ -260,6 +262,7 @@ struct GameView: View {
                 
                 Button("Menu") {
                     if highScoreManager.isHighScore(viewModel.stats.totalScore) {
+                        viewModel.shouldAdvanceAfterNameInput = false
                         viewModel.showNameInput = true
                     } else {
                         viewModel.returnToMenu()
@@ -283,7 +286,11 @@ struct GameView: View {
             highScoreManager: highScoreManager
         ) {
             viewModel.showNameInput = false
-            viewModel.returnToMenu()
+            if viewModel.shouldAdvanceAfterNameInput {
+                viewModel.advanceToNextLevel()
+            } else {
+                viewModel.returnToMenu()
+            }
         }
     }
 }

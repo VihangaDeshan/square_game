@@ -8,6 +8,7 @@ class GameViewModel: ObservableObject {
     @Published var stats: GameStats = GameStats()
     @Published var levelConfig: LevelConfig = LevelConfig(level: 1)
     @Published var showNameInput: Bool = false
+    @Published var shouldAdvanceAfterNameInput: Bool = false
     
     // MARK: - Private Properties
     private var firstSelectedIndex: Int? = nil
