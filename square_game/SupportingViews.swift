@@ -244,7 +244,9 @@ struct InfoView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Score Mode (Levels 1-7)")
                         .font(.subheadline).bold()
+                        .foregroundColor(.blue)
                     bulletPoint("⚠️ You MUST complete within max turns or level fails!")
+                    bulletPoint("Fixed 3×3 grid for all levels")
                     bulletPoint("Level 1: 10 max turns")
                     bulletPoint("Level 2: 9 max turns")
                     bulletPoint("Level 3: 8 max turns")
@@ -257,11 +259,47 @@ struct InfoView: View {
                 Divider()
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Time Mode (Level 8+)")
+                    Text("Time Mode")
                         .font(.subheadline).bold()
+                        .foregroundColor(.orange)
                     bulletPoint("Find all matches before the timer runs out")
                     bulletPoint("30 seconds per level")
-                    bulletPoint("Same 3×3 grid, now race against the clock!")
+                    bulletPoint("Fixed 3×3 grid for all levels")
+                    bulletPoint("Race against the clock!")
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("🔥 Difficult Mode")
+                            .font(.subheadline).bold()
+                            .foregroundColor(.red)
+                        Text("EXTREME CHALLENGE!")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.red))
+                    }
+                    
+                    bulletPoint("⚡ Grid EXPANDS as you progress:")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("  • Levels 1-3: 3×3 grid (4 pairs)")
+                            .font(.caption)
+                        Text("  • Levels 4-6: 4×4 grid (8 pairs)")
+                            .font(.caption)
+                        Text("  • Levels 7-9: 5×5 grid (12 pairs)")
+                            .font(.caption)
+                        Text("  • Levels 10+: 6×6 grid (18 pairs)")
+                            .font(.caption)
+                    }
+                    
+                    bulletPoint("🔄 Colors SHUFFLE after EVERY match!")
+                    bulletPoint("Matched pairs stay, but all other cards change colors")
+                    bulletPoint("You must constantly re-adapt and re-memorize")
+                    bulletPoint("45 seconds per level (vs 30 for time mode)")
+                    bulletPoint("True test of working memory and pattern recognition")
                 }
             }
         }
@@ -279,10 +317,20 @@ struct InfoView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 bulletPoint("Each level starts with 1 bonus life")
-                bulletPoint("⭐ Complete with exactly 4 moves = Extra bonus life!")
+                bulletPoint("⭐ Complete with exactly 4 moves in 3×3 grids = Extra bonus life!")
                 bulletPoint("If you run out of turns/time, the life is used automatically")
-                bulletPoint("Score Mode: Grants 2 extra turns")
-                bulletPoint("Time Mode: Grants 10 extra seconds")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Bonus Life Effects:")
+                        .font(.subheadline)
+                        .bold()
+                        .padding(.top, 4)
+                    Text("  • Score Mode: Grants 2 extra turns")
+                        .font(.caption)
+                    Text("  • Time Mode: Grants 10 extra seconds")
+                        .font(.caption)
+                    Text("  • Difficult Mode: Grants 10 extra seconds")
+                        .font(.caption)
+                }
             }
         }
         .padding()
@@ -298,11 +346,30 @@ struct InfoView: View {
                 .font(.headline)
             
             VStack(alignment: .leading, spacing: 8) {
-                bulletPoint("Base: 100 points per match")
-                bulletPoint("Bonus for unused turns in Score Mode")
-                bulletPoint("Bonus for remaining time in Time Mode")
-                bulletPoint("Level multiplier: 50 points × level number")
-                bulletPoint("Perfect game (minimum turns): 200 point bonus!")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Score & Time Modes:")
+                        .font(.subheadline)
+                        .bold()
+                    bulletPoint("Base: 100 points per match")
+                    bulletPoint("Bonus for unused turns in Score Mode")
+                    bulletPoint("Bonus for remaining time in Time Mode")
+                    bulletPoint("Level multiplier: 50 points × level number")
+                    bulletPoint("Perfect game (4 moves): 200 point bonus!")
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Difficult Mode:")
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundColor(.red)
+                    bulletPoint("Base: 150 points per match (higher!)")
+                    bulletPoint("Time bonus: 15 points per remaining second")
+                    bulletPoint("Level multiplier: 75 points × level number")
+                    bulletPoint("Shuffle penalty: -5 points per shuffle")
+                    bulletPoint("Larger grids = more points potential")
+                }
             }
         }
         .padding()
