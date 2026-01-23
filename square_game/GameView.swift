@@ -168,9 +168,19 @@ struct GameView: View {
     
     var winOverlay: some View {
         VStack(spacing: 20) {
-            Text("🎉 Level Complete! 🎉")
-                .font(.largeTitle).bold()
-                .foregroundColor(.green)
+            // Check if it was a perfect game
+            if viewModel.levelConfig.mode == .score && viewModel.stats.turns == 4 {
+                Text("⭐ PERFECT GAME! ⭐")
+                    .font(.largeTitle).bold()
+                    .foregroundColor(.yellow)
+                Text("Bonus Life Earned!")
+                    .font(.title3)
+                    .foregroundColor(.orange)
+            } else {
+                Text("🎉 Level Complete! 🎉")
+                    .font(.largeTitle).bold()
+                    .foregroundColor(.green)
+            }
             
             Text("Score: \(viewModel.stats.totalScore)")
                 .font(.title2)
@@ -181,6 +191,7 @@ struct GameView: View {
             if viewModel.levelConfig.mode == .score {
                 Text("Turns Used: \(viewModel.stats.turns)/\(viewModel.levelConfig.maxTurns ?? 0)")
                     .font(.headline)
+                    .foregroundColor(viewModel.stats.turns == 4 ? .green : .primary)
             } else {
                 Text("Time Remaining: \(viewModel.stats.timeRemaining)s")
                     .font(.headline)
@@ -226,8 +237,14 @@ struct GameView: View {
                 .font(.title2)
             
             if viewModel.levelConfig.mode == .score {
-                Text("You ran out of turns!")
-                    .font(.headline)
+                VStack(spacing: 8) {
+                    Text("Exceeded max turns!")
+                        .font(.headline)
+                        .foregroundColor(.red)
+                    Text("Max: \(viewModel.levelConfig.maxTurns ?? 0) | Used: \(viewModel.stats.turns)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
             } else {
                 Text("Time's up!")
                     .font(.headline)

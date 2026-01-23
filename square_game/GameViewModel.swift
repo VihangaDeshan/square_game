@@ -149,6 +149,12 @@ class GameViewModel: ObservableObject {
         let totalPairs = (gridSize * gridSize) / 2
         if stats.matchesFound == totalPairs {
             stopTimer()
+            
+            // Check if player achieved perfect score (4 moves) and award bonus life
+            if levelConfig.mode == .score && stats.turns == LevelConfig.perfectTurns {
+                stats.bonusLives += 1 // Award bonus life for perfect game
+            }
+            
             calculateScore()
             gameState = .won
         }
@@ -156,7 +162,9 @@ class GameViewModel: ObservableObject {
     
     private func checkLossCondition() {
         if levelConfig.mode == .score {
-            if let maxTurns = levelConfig.maxTurns, stats.turns >= maxTurns {
+            // Check if player has exceeded max allowed turns
+            if let maxTurns = levelConfig.maxTurns, stats.turns > maxTurns {
+                // Exceeded max turns - level failed
                 handleGameOver()
             }
         }
@@ -243,7 +251,7 @@ class GameViewModel: ObservableObject {
         case .score:
             startNewGame(level: 1)
         case .time:
-            startNewGame(level: 6)
+            startNewGame(level: 8) // Time mode starts at level 8
         }
     }
 }

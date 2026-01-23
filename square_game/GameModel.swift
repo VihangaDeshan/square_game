@@ -46,27 +46,47 @@ struct LevelConfig {
     init(level: Int) {
         self.level = level
         
-        // Levels 1-5: Score Mode
-        if level <= 5 {
+        // Levels 1-7: Score Mode with decreasing max moves
+        // Level 1: 10, Level 2: 9, Level 3: 8, Level 4: 7, Level 5: 6, Level 6: 5, Level 7: 4
+        if level <= 7 {
             self.mode = .score
             self.maxTime = nil
-            // Level 1: 10 turns, Level 2: 8, Level 3: 6, Level 4: 5, Level 5: 4
-            switch level {
-            case 1: self.maxTurns = 10
-            case 2: self.maxTurns = 8
-            case 3: self.maxTurns = 6
-            case 4: self.maxTurns = 5
-            default: self.maxTurns = 4
-            }
+            // Formula: maxTurns = 11 - level (10, 9, 8, 7, 6, 5, 4)
+            self.maxTurns = 11 - level
         } else {
-            // Levels 6+: Time Mode
+            // Levels 8+: Time Mode (3x3 grid with time limit)
             self.mode = .time
             self.maxTurns = nil
             self.maxTime = 30
         }
     }
+    
+    // Check if this is the last score mode level
+    var isLastScoreLevel: Bool {
+        return level == 7 && mode == .score
+    }
+    
+    // Minimum possible turns for 3x3 grid (4 pairs)
+    static let perfectTurns = 4
 }
 
+
+// MARK: - High Score Entry
+struct HighScoreEntry: Codable, Identifiable {
+    let id: UUID
+    let playerName: String
+    let score: Int
+    let level: Int
+    let date: Date
+    
+    init(playerName: String, score: Int, level: Int) {
+        self.id = UUID()
+        self.playerName = playerName
+        self.score = score
+        self.level = level
+        self.date = Date()
+    }
+}
 
 // MARK: - Game Stats
 struct GameStats {

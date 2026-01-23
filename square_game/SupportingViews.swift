@@ -242,21 +242,26 @@ struct InfoView: View {
             
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Score Mode (Levels 1-5)")
+                    Text("Score Mode (Levels 1-7)")
                         .font(.subheadline).bold()
-                    bulletPoint("Limited number of turns to find all matches")
-                    bulletPoint("Level 1: 10 turns, Level 2: 8 turns, Level 3: 6 turns")
-                    bulletPoint("Level 4: 5 turns, Level 5: 4 turns")
+                    bulletPoint("⚠️ You MUST complete within max turns or level fails!")
+                    bulletPoint("Level 1: 10 max turns")
+                    bulletPoint("Level 2: 9 max turns")
+                    bulletPoint("Level 3: 8 max turns")
+                    bulletPoint("Level 4: 7 max turns")
+                    bulletPoint("Level 5: 6 max turns")
+                    bulletPoint("Level 6: 5 max turns")
+                    bulletPoint("Level 7: 4 max turns (Perfect Score!)")
                 }
                 
                 Divider()
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Time Mode (Level 6+)")
+                    Text("Time Mode (Level 8+)")
                         .font(.subheadline).bold()
                     bulletPoint("Find all matches before the timer runs out")
                     bulletPoint("30 seconds per level")
-                    bulletPoint("Race against the clock!")
+                    bulletPoint("Same 3×3 grid, now race against the clock!")
                 }
             }
         }
@@ -274,6 +279,7 @@ struct InfoView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 bulletPoint("Each level starts with 1 bonus life")
+                bulletPoint("⭐ Complete with exactly 4 moves = Extra bonus life!")
                 bulletPoint("If you run out of turns/time, the life is used automatically")
                 bulletPoint("Score Mode: Grants 2 extra turns")
                 bulletPoint("Time Mode: Grants 10 extra seconds")
