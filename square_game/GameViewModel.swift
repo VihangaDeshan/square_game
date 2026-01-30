@@ -431,6 +431,7 @@ class GameViewModel: ObservableObject {
     
     // MARK: - Save Score to Firebase
     func saveScoreToFirebase() {
+        print("🎮 saveScoreToFirebase called: score=\(stats.totalScore), level=\(stats.currentLevel), mode=\(levelConfig.mode)")
         Task {
             await FirebaseManager.shared.updateUserStats(
                 score: stats.totalScore,

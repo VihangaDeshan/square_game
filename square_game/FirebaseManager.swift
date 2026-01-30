@@ -16,10 +16,6 @@ struct UserProfile: Codable, Identifiable {
     var achievements: [String]
     var createdAt: Date
     var lastPlayed: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case id, username, email, country, totalScore, gamesPlayed, highestLevel, achievements, createdAt, lastPlayed
-    }
 }
 
 // MARK: - Score Entry Model
@@ -92,8 +88,10 @@ class FirebaseManager: ObservableObject {
                 self?.isAuthenticated = user != nil
                 
                 if let user = user {
+                    print("🔐 Auth state changed: User logged in - \(user.uid)")
                     await self?.loadUserProfile(userId: user.uid)
                 } else {
+                    print("🔓 Auth state changed: User logged out")
                     self?.userProfile = nil
                 }
             }
@@ -103,7 +101,9 @@ class FirebaseManager: ObservableObject {
     // MARK: - Register New User
     func registerUser(email: String, password: String, username: String, country: String) async throws {
         do {
+            print("🔐 Starting user registration for email: \(email)")
             let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            print("✅ Firebase Auth user created with UID: \(result.user.uid)")
             
             // Create user profile
             let profile = UserProfile(
@@ -119,11 +119,19 @@ class FirebaseManager: ObservableObject {
                 lastPlayed: Date()
             )
             
+            print("💾 Saving user profile to Firestore...")
             try await saveUserProfile(profile)
-            await loadUserProfile(userId: result.user.uid)
+            print("✅ User profile saved successfully")
+            
+            // Set the profile immediately
+            userProfile = profile
+            print("✅ User profile loaded: \(profile.username)")
+            print("✅ Registration complete!")
             
             authError = nil
         } catch {
+            print("❌ Registration error: \(error.localizedDescription)")
+            print("❌ Error details: \(error)")
             authError = error.localizedDescription
             throw error
         }
@@ -132,10 +140,27 @@ class FirebaseManager: ObservableObject {
     // MARK: - Sign In
     func signIn(email: String, password: String) async throws {
         do {
+            print("🔐 Signing in user: \(email)")
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            print("✅ User authenticated: \(result.user.uid)")
+            
             await loadUserProfile(userId: result.user.uid)
+            
+            if userProfile == nil {
+                print("⚠️ Profile not found, waiting and retrying...")
+                try await Task.sleep(nanoseconds: 1_000_000_000) // Wait 1 second
+                await loadUserProfile(userId: result.user.uid)
+            }
+            
+            if let profile = userProfile {
+                print("✅ Profile loaded: \(profile.username), Score: \(profile.totalScore)")
+            } else {
+                print("❌ Failed to load profile after retry")
+            }
+            
             authError = nil
         } catch {
+            print("❌ Sign in error: \(error.localizedDescription)")
             authError = error.localizedDescription
             throw error
         }
@@ -152,69 +177,134 @@ class FirebaseManager: ObservableObject {
     // MARK: - Load User Profile
     private func loadUserProfile(userId: String) async {
         do {
+            print("📖 Loading user profile for: \(userId)")
             let document = try await db.collection("users").document(userId).getDocument()
             
-            if let data = document.data() {
-                let decoder = Firestore.Decoder()
-                userProfile = try decoder.decode(UserProfile.self, from: data)
+            guard let data = document.data() else {
+                print("❌ No user profile data found for userId: \(userId)")
+                print("❌ Document exists: \(document.exists)")
+                return
+            }
+            
+            print("📄 Profile data found: \(data.keys)")
+            
+            // Manually parse the data
+            userProfile = UserProfile(
+                id: data["id"] as? String ?? userId,
+                username: data["username"] as? String ?? "",
+                email: data["email"] as? String ?? "",
+                country: data["country"] as? String ?? "",
+                totalScore: data["totalScore"] as? Int ?? 0,
+                gamesPlayed: data["gamesPlayed"] as? Int ?? 0,
+                highestLevel: data["highestLevel"] as? Int ?? 1,
+                achievements: data["achievements"] as? [String] ?? [],
+                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+                lastPlayed: (data["lastPlayed"] as? Timestamp)?.dateValue() ?? Date()
+            )
+            
+            if let profile = userProfile {
+                print("✅ Profile loaded successfully: \(profile.username)")
             }
         } catch {
-            print("Error loading user profile: \(error.localizedDescription)")
+            print("❌ Error loading user profile: \(error.localizedDescription)")
+            print("❌ Error details: \(error)")
+        }
+    }
+    
+    // MARK: - Refresh User Profile
+    func refreshUserProfile() async {
+        guard let userId = currentUser?.uid else {
+            print("⚠️ Cannot refresh profile: no authenticated user")
+            return
+        }
+        
+        print("🔄 Refreshing user profile...")
+        await loadUserProfile(userId: userId)
+        
+        if userProfile != nil {
+            print("✅ Profile refresh successful")
+        } else {
+            print("❌ Profile refresh failed")
         }
     }
     
     // MARK: - Save User Profile
     private func saveUserProfile(_ profile: UserProfile) async throws {
-        let encoder = Firestore.Encoder()
-        let data = try encoder.encode(profile)
+        let data: [String: Any] = [
+            "id": profile.id,
+            "username": profile.username,
+            "email": profile.email,
+            "country": profile.country,
+            "totalScore": profile.totalScore,
+            "gamesPlayed": profile.gamesPlayed,
+            "highestLevel": profile.highestLevel,
+            "achievements": profile.achievements,
+            "createdAt": Timestamp(date: profile.createdAt),
+            "lastPlayed": Timestamp(date: profile.lastPlayed)
+        ]
+        
         try await db.collection("users").document(profile.id).setData(data)
     }
     
     // MARK: - Update User Stats
     func updateUserStats(score: Int, level: Int, mode: GameMode) async {
-        guard let userId = currentUser?.uid, var profile = userProfile else { return }
+        guard let userId = currentUser?.uid, var profile = userProfile else {
+            print("⚠️ Cannot update stats: userId=\(currentUser?.uid ?? "nil"), profile=\(userProfile == nil ? "nil" : "exists")")
+            return
+        }
         
+        print("📊 Updating user stats: score=\(score), level=\(level), mode=\(mode)")
         profile.totalScore += score
         profile.gamesPlayed += 1
         profile.highestLevel = max(profile.highestLevel, level)
         profile.lastPlayed = Date()
         
         do {
+            print("💾 Saving updated profile...")
             try await saveUserProfile(profile)
             userProfile = profile
+            print("✅ Profile saved. Total score: \(profile.totalScore), Games: \(profile.gamesPlayed)")
             
             // Save score to leaderboard
+            print("🏆 Saving score to leaderboard...")
             await saveScore(score: score, level: level, mode: mode)
             
             // Check and unlock achievements
+            print("🎖️ Checking achievements...")
             await checkAchievements(score: score, level: level, mode: mode)
         } catch {
-            print("Error updating user stats: \(error.localizedDescription)")
+            print("❌ Error updating user stats: \(error.localizedDescription)")
+            print("❌ Error details: \(error)")
         }
     }
     
     // MARK: - Save Score to Leaderboard
     private func saveScore(score: Int, level: Int, mode: GameMode) async {
         guard let userId = currentUser?.uid,
-              let profile = userProfile else { return }
+              let profile = userProfile else {
+            print("⚠️ Cannot save score: no user or profile")
+            return
+        }
         
-        let scoreEntry = ScoreEntry(
-            id: UUID().uuidString,
-            userId: userId,
-            username: profile.username,
-            country: profile.country,
-            score: score,
-            level: level,
-            mode: mode.description,
-            timestamp: Date()
-        )
+        let scoreId = UUID().uuidString
+        let scoreEntry: [String: Any] = [
+            "id": scoreId,
+            "userId": userId,
+            "username": profile.username,
+            "country": profile.country,
+            "score": score,
+            "level": level,
+            "mode": mode.description,
+            "timestamp": Timestamp(date: Date())
+        ]
         
         do {
-            let encoder = Firestore.Encoder()
-            let data = try encoder.encode(scoreEntry)
-            try await db.collection("scores").document(scoreEntry.id).setData(data)
+            print("💾 Saving score to Firestore: score=\(score), level=\(level), mode=\(mode.description)")
+            try await db.collection("scores").document(scoreId).setData(scoreEntry)
+            print("✅ Score saved to leaderboard successfully!")
         } catch {
-            print("Error saving score: \(error.localizedDescription)")
+            print("❌ Error saving score: \(error.localizedDescription)")
+            print("❌ Score error details: \(error)")
         }
     }
     
@@ -225,9 +315,19 @@ class FirebaseManager: ObservableObject {
             .limit(to: limit)
             .getDocuments()
         
-        let decoder = Firestore.Decoder()
-        return try snapshot.documents.compactMap { doc in
-            try decoder.decode(ScoreEntry.self, from: doc.data())
+        return snapshot.documents.compactMap { doc -> ScoreEntry? in
+            let data = doc.data()
+            guard let id = data["id"] as? String,
+                  let userId = data["userId"] as? String,
+                  let username = data["username"] as? String,
+                  let country = data["country"] as? String,
+                  let score = data["score"] as? Int,
+                  let level = data["level"] as? Int,
+                  let mode = data["mode"] as? String,
+                  let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                return nil
+            }
+            return ScoreEntry(id: id, userId: userId, username: username, country: country, score: score, level: level, mode: mode, timestamp: timestamp)
         }
     }
     
@@ -239,9 +339,19 @@ class FirebaseManager: ObservableObject {
             .limit(to: limit)
             .getDocuments()
         
-        let decoder = Firestore.Decoder()
-        return try snapshot.documents.compactMap { doc in
-            try decoder.decode(ScoreEntry.self, from: doc.data())
+        return snapshot.documents.compactMap { doc -> ScoreEntry? in
+            let data = doc.data()
+            guard let id = data["id"] as? String,
+                  let userId = data["userId"] as? String,
+                  let username = data["username"] as? String,
+                  let country = data["country"] as? String,
+                  let score = data["score"] as? Int,
+                  let level = data["level"] as? Int,
+                  let mode = data["mode"] as? String,
+                  let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                return nil
+            }
+            return ScoreEntry(id: id, userId: userId, username: username, country: country, score: score, level: level, mode: mode, timestamp: timestamp)
         }
     }
     
@@ -255,9 +365,19 @@ class FirebaseManager: ObservableObject {
             .limit(to: 100)
             .getDocuments()
         
-        let decoder = Firestore.Decoder()
-        return try snapshot.documents.compactMap { doc in
-            try decoder.decode(ScoreEntry.self, from: doc.data())
+        return snapshot.documents.compactMap { doc -> ScoreEntry? in
+            let data = doc.data()
+            guard let id = data["id"] as? String,
+                  let userId = data["userId"] as? String,
+                  let username = data["username"] as? String,
+                  let country = data["country"] as? String,
+                  let score = data["score"] as? Int,
+                  let level = data["level"] as? Int,
+                  let mode = data["mode"] as? String,
+                  let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                return nil
+            }
+            return ScoreEntry(id: id, userId: userId, username: username, country: country, score: score, level: level, mode: mode, timestamp: timestamp)
         }
     }
     
@@ -278,38 +398,52 @@ class FirebaseManager: ObservableObject {
     }
     
     private func checkAchievements(score: Int, level: Int, mode: GameMode) async {
-        guard var profile = userProfile else { return }
+        guard var profile = userProfile else {
+            print("⚠️ Cannot check achievements: no profile")
+            return
+        }
+        
+        print("🎖️ Checking achievements... Games: \(profile.gamesPlayed), Level: \(level), Total Score: \(profile.totalScore)")
+        print("🎖️ Current achievements: \(profile.achievements)")
         
         var newAchievements: [String] = []
         
         // First Win
         if !profile.achievements.contains("first_win") && profile.gamesPlayed >= 1 {
             newAchievements.append("first_win")
+            print("🎉 Unlocked: First Victory!")
         }
         
         // Level Master
         if !profile.achievements.contains("level_master") && level >= 10 {
             newAchievements.append("level_master")
+            print("🎉 Unlocked: Level Master!")
         }
         
         // Score Hunter
         if !profile.achievements.contains("score_hunter") && profile.totalScore >= 10000 {
             newAchievements.append("score_hunter")
+            print("🎉 Unlocked: Score Hunter!")
         }
         
         // Marathon Runner
         if !profile.achievements.contains("marathon_runner") && profile.gamesPlayed >= 50 {
             newAchievements.append("marathon_runner")
+            print("🎉 Unlocked: Marathon Runner!")
         }
         
         if !newAchievements.isEmpty {
+            print("✅ Found \(newAchievements.count) new achievement(s): \(newAchievements)")
             profile.achievements.append(contentsOf: newAchievements)
             do {
                 try await saveUserProfile(profile)
                 userProfile = profile
+                print("✅ Achievements saved!")
             } catch {
-                print("Error updating achievements: \(error.localizedDescription)")
+                print("❌ Error updating achievements: \(error.localizedDescription)")
             }
+        } else {
+            print("ℹ️ No new achievements unlocked")
         }
     }
     

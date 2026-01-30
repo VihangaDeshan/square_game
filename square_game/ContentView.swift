@@ -32,6 +32,12 @@ struct ContentView: View {
             AchievementsView()
                 .environmentObject(firebaseManager)
         }
+        .onAppear {
+            // Refresh profile when view appears
+            Task {
+                await firebaseManager.refreshUserProfile()
+            }
+        }
     }
     
     var mainMenu: some View {
