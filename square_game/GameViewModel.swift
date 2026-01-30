@@ -226,7 +226,11 @@ class GameViewModel: ObservableObject {
     
     private func handleTimeOut() {
         stopTimer()
-        handusedBonusLife = true
+        
+        // Check if player has a bonus life
+        if stats.bonusLives > 0 && !usedBonusLife {
+            stats.bonusLives -= 1
+            usedBonusLife = true
             
             if levelConfig.mode == .score {
                 // Grant 2 extra turns
@@ -246,14 +250,7 @@ class GameViewModel: ObservableObject {
             gameState = .lost
             
             // Start auto-progress timer for retry
-            startAutoProgressTimer()xtra seconds
-                stats.timeRemaining = 10
-                startTimer()
-            }
-        } else {
-            stopTimer()
-            calculateScore()
-            gameState = .lost
+            startAutoProgressTimer()
         }
     }
     
@@ -282,7 +279,10 @@ class GameViewModel: ObservableObject {
         let levelBonus = stats.currentLevel * 50
         
         stats.totalScore = baseScore + bonus + levelBonus
-    }opAutoProgressTimer()
+    }
+    
+    func advanceToNextLevel() {
+        stopAutoProgressTimer()
         stats.currentLevel += 1
         stats.bonusLives = 1 // Reset bonus life for new level
         let currentMode = levelConfig.mode
@@ -429,11 +429,7 @@ class GameViewModel: ObservableObject {
                 score: stats.totalScore,
                 level: stats.currentLevel,
                 mode: levelConfig.mode
-            
-        case .time:
-            startNewGame(level: 1, mode: .time)
-        case .difficult:
-            startNewGame(level: 1, mode: .difficult)
+            )
         }
     }
 }
