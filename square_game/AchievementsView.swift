@@ -65,7 +65,9 @@ struct AchievementsView: View {
                             }
                             .frame(height: 20)
                             .padding(.horizontal)
+                            .accessibilityLabel("Achievement progress: \(unlockedCount) out of \(achievements.count) unlocked")
                         }
+                        .accessibilityElement(children: .combine)
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 15)
@@ -173,6 +175,9 @@ struct AchievementCardView: View {
         )
         .scaleEffect(achievement.isUnlocked ? 1.0 : 0.95)
         .animation(.spring(), value: achievement.isUnlocked)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(achievement.title). \(achievement.description). Status: \(achievement.isUnlocked ? "Unlocked" : "Locked")")
+        .accessibilityAddTraits(achievement.isUnlocked ? .isStaticText : .isStaticText)
     }
     
     var iconColor: Color {

@@ -30,6 +30,8 @@ struct LeaderboardView: View {
                     }
                     .pickerStyle(.segmented)
                     .padding()
+                    .accessibilityLabel("Leaderboard type")
+                    .accessibilityHint("Choose between global, regional, or your scores")
                     
                     // Content
                     if isLoading {
@@ -70,6 +72,8 @@ struct LeaderboardView: View {
                     }) {
                         Image(systemName: "arrow.clockwise")
                     }
+                    .accessibilityLabel("Refresh leaderboards")
+                    .accessibilityHint("Reload all leaderboard data")
                 }
             }
             .onAppear {
@@ -237,6 +241,8 @@ struct LeaderboardRowView: View {
                 .fill(Color.white.opacity(0.9))
                 .shadow(color: rankColor.opacity(0.3), radius: rank <= 3 ? 5 : 2)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Rank \(rank), \(score.username) from \(score.country), Score: \(score.score), Level: \(score.level), Mode: \(score.mode), \(timeAgo(score.timestamp))")
     }
     
     var rankColor: Color {

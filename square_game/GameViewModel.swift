@@ -2,6 +2,8 @@ import SwiftUI
 import Combine
 
 class GameViewModel: ObservableObject {
+    // MARK: - Accessibility
+    private let accessibility = AccessibilityManager.shared
     // MARK: - Published Properties
     @Published var cards: [Card] = []
     @Published var gameState: GameState = .menu
@@ -115,7 +117,9 @@ class GameViewModel: ObservableObject {
               !cards[index].isMatched,
               !cards[index].isBonus else { return }
         
-        withAnimation(.spring(response: 0.3)) {
+        accessibility.playCardFlipSound()
+        
+        withAnimation(.spring(response: accessibility.getAnimationDuration(0.3))) {
             cards[index].isFlipped = true
         }
         
@@ -132,6 +136,9 @@ class GameViewModel: ObservableObject {
     private func checkForMatch(first: Int, second: Int) {
         if cards[first].colorIndex == cards[second].colorIndex {
             // Match found
+            accessibility.playMatchSound()
+            accessibility.announce("Match found! \(stats.matchesFound + 1) matches")
+            
             cards[first].isMatched = true
             cards[second].isMatched = true
             stats.matchesFound += 1
@@ -145,6 +152,7 @@ class GameViewModel: ObservableObject {
             checkWinCondition()
         } else {
             // No match - flip back after delay
+            accessibility.playMismatchSound()
             isBusy = true
             firstSelectedIndex = nil
             
@@ -209,6 +217,15 @@ class GameViewModel: ObservableObject {
             calculateScore()
             gameState = .won
             
+            // Accessibility feedback
+            accessibility.playLevelCompleteSound()
+            if perfectGameAchieved {
+                accessibility.announce("Perfect game! Bonus life earned. Level complete!")
+            } else {
+                accessibility.announce("Level complete! Score: \(stats.totalScore)")
+            }
+            accessibility.announceScreenChange()
+            
             // Start auto-progress timer
             startAutoProgressTimer()
         }
@@ -228,6 +245,11 @@ class GameViewModel: ObservableObject {
         stopTimer()
         calculateScore()
         gameState = .lost
+        
+        accessibility.playErrorHaptic()
+        accessibility.announce("Game over. Final score: \(stats.totalScore)")
+        accessibility.announceScreenChange()
+        
         startAutoProgressTimer()
     }
     
@@ -239,6 +261,8 @@ class GameViewModel: ObservableObject {
             stats.bonusLives -= 1
             usedBonusLife = true
             
+            accessibility.playWarningHaptic()
+            
             if levelConfig.mode == .score {
                 // Grant 2 extra turns
                 if let maxTurns = levelConfig.maxTurns {
@@ -246,15 +270,21 @@ class GameViewModel: ObservableObject {
                     // Temporarily increase max turns
                     stats.turns = maxTurns - 2
                 }
+                accessibility.announce("Bonus life used! You have \(stats.bonusLives) lives remaining. 2 extra turns granted.")
             } else {
                 // Grant 10 extra seconds
                 stats.timeRemaining = 10
                 startTimer()
+                accessibility.announce("Bonus life used! You have \(stats.bonusLives) lives remaining. 10 extra seconds granted.")
             }
         } else {
             stopTimer()
             calculateScore()
             gameState = .lost
+            
+            accessibility.playErrorHaptic()
+            accessibility.announce("Time's up! Final score: \(stats.totalScore)")
+            accessibility.announceScreenChange()
             
             // Start auto-progress timer for retry
             startAutoProgressTimer()

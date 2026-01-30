@@ -4,12 +4,14 @@ struct ContentView: View {
     @StateObject private var viewModel = GameViewModel()
     @StateObject private var highScoreManager = HighScoreManager()
     @EnvironmentObject var firebaseManager: FirebaseManager
+    @EnvironmentObject var accessibilityManager: AccessibilityManager
     
     @State private var showHighScores = false
     @State private var showInfo = false
     @State private var showLeaderboard = false
     @State private var showAchievements = false
     @State private var showCountryPicker = false
+    @State private var showAccessibilitySettings = false
     
     var body: some View {
         ZStack {
@@ -36,6 +38,10 @@ struct ContentView: View {
         .sheet(isPresented: $showCountryPicker) {
             CountryPickerView()
                 .environmentObject(firebaseManager)
+        }
+        .sheet(isPresented: $showAccessibilitySettings) {
+            AccessibilitySettingsView()
+                .environmentObject(accessibilityManager)
         }
         .onAppear {
             // Refresh profile when view appears
@@ -123,6 +129,8 @@ struct ContentView: View {
                             .padding(12)
                             .background(Circle().fill(Color.white.opacity(0.3)))
                     }
+                    .accessibilityLabel("Profile menu")
+                    .accessibilityHint("Opens profile options")
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
@@ -156,6 +164,8 @@ struct ContentView: View {
                                     .foregroundColor(.white.opacity(0.8))
                             }
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Welcome \(userProfile.username). Country: \(userProfile.country). Highest level: \(userProfile.highestLevel). Total score: \(userProfile.totalScore) points")
                         Spacer()
                         Button(action: {
                             do {
@@ -249,6 +259,7 @@ struct ContentView: View {
                         subtitle: "Begin Level 1",
                         color: .green
                     ) {
+                        accessibilityManager.playButtonTapSound()
                         viewModel.startNewGame(level: 1)
                     }
                     
@@ -268,6 +279,7 @@ struct ContentView: View {
                         // Row 1: Score and Time
                         HStack(spacing: 12) {
                             Button(action: {
+                                accessibilityManager.playButtonTapSound()
                                 viewModel.startInMode(.score)
                             }) {
                                 VStack(spacing: 8) {
@@ -288,8 +300,11 @@ struct ContentView: View {
                                         .shadow(color: Color.blue.opacity(0.5), radius: 5, x: 0, y: 3)
                                 )
                             }
+                            .accessibilityLabel("Score mode")
+                            .accessibilityHint("Play levels 1 through 7")
                             
                             Button(action: {
+                                accessibilityManager.playButtonTapSound()
                                 viewModel.startInMode(.time)
                             }) {
                                 VStack(spacing: 8) {
@@ -310,10 +325,13 @@ struct ContentView: View {
                                         .shadow(color: Color.orange.opacity(0.5), radius: 5, x: 0, y: 3)
                                 )
                             }
+                            .accessibilityLabel("Time mode")
+                            .accessibilityHint("Complete levels within 30 seconds each")
                         }
                         
                         // Row 2: Difficult Mode (full width)
                         Button(action: {
+                            accessibilityManager.playButtonTapSound()
                             viewModel.startInMode(.difficult)
                         }) {
                             HStack(spacing: 12) {
@@ -347,6 +365,8 @@ struct ContentView: View {
                                     .shadow(color: Color.red.opacity(0.5), radius: 5, x: 0, y: 3)
                             )
                         }
+                        .accessibilityLabel("Difficult mode")
+                        .accessibilityHint("Play with expanding grid and shuffling colors")
                     }
                     .padding()
                     .background(
@@ -370,6 +390,7 @@ struct ContentView: View {
                         
                         HStack(spacing: 12) {
                             Button(action: {
+                                accessibilityManager.playButtonTapSound()
                                 showLeaderboard = true
                             }) {
                                 VStack(spacing: 8) {
@@ -390,8 +411,11 @@ struct ContentView: View {
                                         .shadow(color: Color.green.opacity(0.5), radius: 5, x: 0, y: 3)
                                 )
                             }
+                            .accessibilityLabel("Leaderboard")
+                            .accessibilityHint("View global and regional high scores")
                             
                             Button(action: {
+                                accessibilityManager.playButtonTapSound()
                                 showAchievements = true
                             }) {
                                 VStack(spacing: 8) {
@@ -412,6 +436,8 @@ struct ContentView: View {
                                         .shadow(color: Color.yellow.opacity(0.5), radius: 5, x: 0, y: 3)
                                 )
                             }
+                            .accessibilityLabel("Achievements")
+                            .accessibilityHint("View unlocked achievements and progress")
                         }
                     }
                     .padding()
@@ -427,6 +453,7 @@ struct ContentView: View {
                         subtitle: "View Top Players",
                         color: .orange
                     ) {
+                        accessibilityManager.playButtonTapSound()
                         showHighScores = true
                     }
                     
@@ -436,7 +463,18 @@ struct ContentView: View {
                         subtitle: "Learn the Rules",
                         color: .purple
                     ) {
+                        accessibilityManager.playButtonTapSound()
                         showInfo = true
+                    }
+                    
+                    MenuButton(
+                        icon: "accessibility",
+                        title: "Accessibility Settings",
+                        subtitle: "Customize Experience",
+                        color: .cyan
+                    ) {
+                        accessibilityManager.playButtonTapSound()
+                        showAccessibilitySettings = true
                     }
                 }
                 .padding(.horizontal, 30)
@@ -492,6 +530,8 @@ struct MenuButton: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
     }
 }
 
@@ -527,15 +567,19 @@ struct CountryPickerView: View {
                                 HStack {
                                     Text(getCountryFlag(country))
                                         .font(.title2)
+                                        .accessibilityHidden(true)
                                     Text(country)
                                         .foregroundColor(.primary)
                                     Spacer()
                                     if firebaseManager.userProfile?.country == country {
                                         Image(systemName: "checkmark")
                                             .foregroundColor(.blue)
+                                            .accessibilityHidden(true)
                                     }
                                 }
                             }
+                            .accessibilityLabel(country + (firebaseManager.userProfile?.country == country ? ", selected" : ""))
+                            .accessibilityHint("Double tap to select \(country)")
                         }
                     } header: {
                         Text("Select Your Country")

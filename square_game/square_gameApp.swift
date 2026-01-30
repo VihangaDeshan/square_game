@@ -20,16 +20,22 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct square_gameApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var firebaseManager = FirebaseManager.shared
+    @StateObject private var accessibilityManager = AccessibilityManager.shared
     
     var body: some Scene {
         WindowGroup {
-            if firebaseManager.isAuthenticated {
-                ContentView()
-                    .environmentObject(firebaseManager)
-            } else {
-                AuthenticationView()
-                    .environmentObject(firebaseManager)
+            Group {
+                if firebaseManager.isAuthenticated {
+                    ContentView()
+                        .environmentObject(firebaseManager)
+                        .environmentObject(accessibilityManager)
+                } else {
+                    AuthenticationView()
+                        .environmentObject(firebaseManager)
+                        .environmentObject(accessibilityManager)
+                }
             }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }
 }

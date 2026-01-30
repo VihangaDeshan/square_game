@@ -4,6 +4,7 @@ import FirebaseAuth
 // MARK: - Authentication View
 struct AuthenticationView: View {
     @EnvironmentObject var firebaseManager: FirebaseManager
+    @EnvironmentObject var accessibilityManager: AccessibilityManager
     @State private var isLoginMode = true
     @State private var email = ""
     @State private var password = ""
@@ -62,6 +63,8 @@ struct AuthenticationView: View {
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .autocapitalization(.none)
                                     .padding(.horizontal)
+                                    .accessibilityLabel("Username")
+                                    .accessibilityHint("Enter your username for registration")
                             }
                             
                             // Email
@@ -70,11 +73,15 @@ struct AuthenticationView: View {
                                 .autocapitalization(.none)
                                 .keyboardType(.emailAddress)
                                 .padding(.horizontal)
+                                .accessibilityLabel("Email address")
+                                .accessibilityHint("Enter your email address")
                             
                             // Password
                             SecureField("Password", text: $password)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                                 .padding(.horizontal)
+                                .accessibilityLabel("Password")
+                                .accessibilityHint("Enter your password")
                             
                             // Country (Register only)
                             if !isLoginMode {
@@ -87,6 +94,8 @@ struct AuthenticationView: View {
                                 .pickerStyle(.menu)
                                 .padding(.horizontal)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityLabel("Country selection")
+                                .accessibilityValue(country.isEmpty ? "No country selected" : country)
                             }
                             
                             // Submit Button
@@ -110,6 +119,8 @@ struct AuthenticationView: View {
                             }
                             .disabled(isLoading || !isFormValid)
                             .padding(.horizontal)
+                            .accessibilityLabel(isLoginMode ? "Login" : "Register")
+                            .accessibilityHint(isLoginMode ? "Sign in with your credentials" : "Create new account")
                             
                             // Error Message
                             if showError {
@@ -148,6 +159,8 @@ struct AuthenticationView: View {
         showError = false
         errorMessage = ""
         
+        accessibilityManager.playButtonTapSound()
+        
         Task {
             do {
                 if isLoginMode {
@@ -162,12 +175,16 @@ struct AuthenticationView: View {
                 }
                 await MainActor.run {
                     isLoading = false
+                    accessibilityManager.playSuccessHaptic()
+                    accessibilityManager.announce(isLoginMode ? "Signed in successfully" : "Account created successfully")
                 }
             } catch {
                 await MainActor.run {
                     isLoading = false
                     errorMessage = error.localizedDescription
                     showError = true
+                    accessibilityManager.playErrorHaptic()
+                    accessibilityManager.announce("Error: \(error.localizedDescription)")
                 }
             }
         }
