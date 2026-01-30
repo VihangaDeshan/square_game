@@ -21,6 +21,7 @@ struct square_gameApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var firebaseManager = FirebaseManager.shared
     @StateObject private var accessibilityManager = AccessibilityManager.shared
+    @StateObject private var analyticsManager = AnalyticsManager.shared
     
     var body: some Scene {
         WindowGroup {
@@ -29,13 +30,26 @@ struct square_gameApp: App {
                     ContentView()
                         .environmentObject(firebaseManager)
                         .environmentObject(accessibilityManager)
+                        .environmentObject(analyticsManager)
                 } else {
                     AuthenticationView()
                         .environmentObject(firebaseManager)
                         .environmentObject(accessibilityManager)
+                        .environmentObject(analyticsManager)
                 }
             }
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .sheet(isPresented: $analyticsManager.needsConsent) {
+                AnalyticsConsentView()
+                    .environmentObject(analyticsManager)
+                    .environmentObject(accessibilityManager)
+            }
+            .onAppear {
+                analyticsManager.startSession()
+            }
+            .onDisappear {
+                analyticsManager.endSession()
+            }
         }
     }
 }

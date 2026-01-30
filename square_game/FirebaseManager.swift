@@ -523,11 +523,13 @@ class FirebaseManager: ObservableObject {
         print("🎖️ Current achievements: \(profile.achievements)")
         
         var newAchievements: [String] = []
+        let analytics = AnalyticsManager.shared
         
         // First Win
         if !profile.achievements.contains("first_win") && profile.gamesPlayed >= 1 {
             newAchievements.append("first_win")
             print("🎉 Unlocked: First Victory!")
+            analytics.trackAchievementUnlocked(achievementId: "first_win", achievementName: "First Victory")
         }
         
         // Level Master

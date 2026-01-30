@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var highScoreManager = HighScoreManager()
     @EnvironmentObject var firebaseManager: FirebaseManager
     @EnvironmentObject var accessibilityManager: AccessibilityManager
+    @EnvironmentObject var analyticsManager: AnalyticsManager
     
     @State private var showHighScores = false
     @State private var showInfo = false
@@ -12,6 +13,7 @@ struct ContentView: View {
     @State private var showAchievements = false
     @State private var showCountryPicker = false
     @State private var showAccessibilitySettings = false
+    @State private var showPrivacySettings = false
     
     var body: some View {
         ZStack {
@@ -41,6 +43,11 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAccessibilitySettings) {
             AccessibilitySettingsView()
+                .environmentObject(accessibilityManager)
+        }
+        .sheet(isPresented: $showPrivacySettings) {
+            AnalyticsConsentView()
+                .environmentObject(analyticsManager)
                 .environmentObject(accessibilityManager)
         }
         .onAppear {
@@ -115,9 +122,11 @@ struct ContentView: View {
                         
                         Button(role: .destructive, action: {
                             do {
+                                analyticsManager.trackLogout()
                                 try firebaseManager.signOut()
                             } catch {
                                 print("Error signing out: \(error)")
+                                analyticsManager.trackError(error: error, context: "logout")
                             }
                         }) {
                             Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
@@ -260,6 +269,7 @@ struct ContentView: View {
                         color: .green
                     ) {
                         accessibilityManager.playButtonTapSound()
+                        analyticsManager.trackFeatureUsed(featureName: "start_game", parameters: ["entry_point": "main_menu"])
                         viewModel.startNewGame(level: 1)
                     }
                     
@@ -391,6 +401,8 @@ struct ContentView: View {
                         HStack(spacing: 12) {
                             Button(action: {
                                 accessibilityManager.playButtonTapSound()
+                                analyticsManager.trackScreenView(screenName: "Leaderboard", screenClass: "LeaderboardView")
+                                analyticsManager.trackFeatureUsed(featureName: "view_leaderboard")
                                 showLeaderboard = true
                             }) {
                                 VStack(spacing: 8) {
@@ -416,6 +428,8 @@ struct ContentView: View {
                             
                             Button(action: {
                                 accessibilityManager.playButtonTapSound()
+                                analyticsManager.trackScreenView(screenName: "Achievements", screenClass: "AchievementsView")
+                                analyticsManager.trackFeatureUsed(featureName: "view_achievements")
                                 showAchievements = true
                             }) {
                                 VStack(spacing: 8) {
@@ -475,6 +489,17 @@ struct ContentView: View {
                     ) {
                         accessibilityManager.playButtonTapSound()
                         showAccessibilitySettings = true
+                    }
+                    
+                    MenuButton(
+                        icon: "hand.raised.fill",
+                        title: "Privacy & Data",
+                        subtitle: "Manage Data Collection",
+                        color: .indigo
+                    ) {
+                        accessibilityManager.playButtonTapSound()
+                        analyticsManager.trackFeatureUsed(featureName: "view_privacy_settings")
+                        showPrivacySettings = true
                     }
                 }
                 .padding(.horizontal, 30)
