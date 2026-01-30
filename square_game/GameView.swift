@@ -238,13 +238,13 @@ struct GameView: View {
             
             HStack(spacing: 20) {
                 Button("Next Level Now") {
-                    viewModel.saveScoreToFirebase()
+                    viewModel.saveScore(to: highScoreManager)
                     viewModel.advanceToNextLevel()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Menu") {
-                    viewModel.saveScoreToFirebase()
+                    viewModel.saveScore(to: highScoreManager)
                     viewModel.returnToMenu()
                 }
                 .buttonStyle(.bordered)
@@ -297,13 +297,13 @@ struct GameView: View {
             
             HStack(spacing: 20) {
                 Button("Retry Now") {
-                    viewModel.saveScoreToFirebase()
+                    viewModel.saveScore(to: highScoreManager)
                     viewModel.restartCurrentLevel()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Menu") {
-                    viewModel.saveScoreToFirebase()
+                    viewModel.saveScore(to: highScoreManager)
                     viewModel.returnToMenu()
                 }
                 .buttonStyle(.bordered)

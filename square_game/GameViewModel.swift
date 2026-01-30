@@ -429,14 +429,67 @@ class GameViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Save Score to Firebase
-    func saveScoreToFirebase() {
-        print("🎮 saveScoreToFirebase called: score=\(stats.totalScore), level=\(stats.currentLevel), mode=\(levelConfig.mode)")
+    // MARK: - Save Score
+    func saveScore(to highScoreManager: HighScoreManager) {
+        // CRITICAL: Capture values immediately before any async operations
+        let finalScore = stats.totalScore
+        let finalLevel = stats.currentLevel
+        let gameMode = levelConfig.mode
+        
+        print("🎮 saveScore called: score=\(finalScore), level=\(finalLevel), mode=\(gameMode)")
+        
+        // Always save to local high scores first
+        if finalScore > 0 {
+            let playerName = FirebaseManager.shared.userProfile?.username ?? "Player"
+            let entry = HighScoreEntry(
+                playerName: playerName,
+                score: finalScore,
+                level: finalLevel,
+                date: Date()
+            )
+            print("💾 Saving local high score: \(finalScore) for \(playerName)")
+            highScoreManager.saveHighScore(entry)
+            print("✅ Local score saved")
+        }
+        
+        // Save to Firebase if authenticated - using captured values
         Task {
+            // Check if user has profile, if not create one
+            if FirebaseManager.shared.currentUser != nil && FirebaseManager.shared.userProfile == nil {
+                print("⚠️ User authenticated but no profile - attempting to create...")
+                await FirebaseManager.shared.createMissingProfile()
+            }
+            
             await FirebaseManager.shared.updateUserStats(
-                score: stats.totalScore,
-                level: stats.currentLevel,
-                mode: levelConfig.mode
+                score: finalScore,
+                level: finalLevel,
+                mode: gameMode
+            )
+        }
+    }
+    
+    // MARK: - Save Score to Firebase (deprecated)
+    func saveScoreToFirebase() {
+        // CRITICAL: Capture values immediately before any async operations
+        let finalScore = stats.totalScore
+        let finalLevel = stats.currentLevel
+        let gameMode = levelConfig.mode
+        
+        print("⚠️ saveScoreToFirebase is deprecated")
+        print("🎮 saveScoreToFirebase called: score=\(finalScore), level=\(finalLevel), mode=\(gameMode)")
+        
+        // Save to Firebase if authenticated
+        Task {
+            // Check if user has profile, if not create one
+            if FirebaseManager.shared.currentUser != nil && FirebaseManager.shared.userProfile == nil {
+                print("⚠️ User authenticated but no profile - attempting to create...")
+                await FirebaseManager.shared.createMissingProfile()
+            }
+            
+            await FirebaseManager.shared.updateUserStats(
+                score: finalScore,
+                level: finalLevel,
+                mode: gameMode
             )
         }
     }

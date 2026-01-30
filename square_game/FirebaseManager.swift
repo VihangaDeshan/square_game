@@ -228,6 +228,58 @@ class FirebaseManager: ObservableObject {
         }
     }
     
+    // MARK: - Create Missing Profile
+    func createMissingProfile() async {
+        guard let user = currentUser else {
+            print("⚠️ Cannot create profile: no authenticated user")
+            return
+        }
+        
+        print("🔧 Creating missing profile for user: \(user.uid)")
+        
+        // Try to get country from user metadata or use a default
+        let defaultCountry = "Other" // Changed from "Unknown" to "Other" which is in the country list
+        
+        let profile = UserProfile(
+            id: user.uid,
+            username: user.email?.components(separatedBy: "@").first ?? "Player",
+            email: user.email ?? "",
+            country: defaultCountry,
+            totalScore: 0,
+            gamesPlayed: 0,
+            highestLevel: 1,
+            achievements: [],
+            createdAt: Date(),
+            lastPlayed: Date()
+        )
+        
+        do {
+            try await saveUserProfile(profile)
+            userProfile = profile
+            print("✅ Missing profile created successfully with country: \(defaultCountry)")
+        } catch {
+            print("❌ Failed to create profile: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Update User Country
+    func updateUserCountry(_ country: String) async {
+        guard var profile = userProfile else {
+            print("⚠️ Cannot update country: no profile loaded")
+            return
+        }
+        
+        profile.country = country
+        
+        do {
+            try await saveUserProfile(profile)
+            userProfile = profile
+            print("✅ Country updated to: \(country)")
+        } catch {
+            print("❌ Failed to update country: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - Save User Profile
     private func saveUserProfile(_ profile: UserProfile) async throws {
         let data: [String: Any] = [

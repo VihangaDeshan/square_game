@@ -13,7 +13,7 @@ struct AuthenticationView: View {
     @State private var errorMessage = ""
     @State private var showError = false
     
-    let countries = ["USA", "UK", "Canada", "Australia", "India", "Germany", "France", "Japan", "China", "Brazil", "Other"]
+    let countries = ["USA", "UK", "Canada", "Australia", "India", "Germany", "France", "Japan", "China", "Brazil", "Sri Lanka", "Other"]
     
     var body: some View {
         ZStack {

@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var showInfo = false
     @State private var showLeaderboard = false
     @State private var showAchievements = false
+    @State private var showCountryPicker = false
     
     var body: some View {
         ZStack {
@@ -32,12 +33,35 @@ struct ContentView: View {
             AchievementsView()
                 .environmentObject(firebaseManager)
         }
+        .sheet(isPresented: $showCountryPicker) {
+            CountryPickerView()
+                .environmentObject(firebaseManager)
+        }
         .onAppear {
             // Refresh profile when view appears
             Task {
                 await firebaseManager.refreshUserProfile()
             }
         }
+    }
+    
+    // Helper function to get country flag
+    private func getCountryFlag(_ country: String) -> String {
+        let flags: [String: String] = [
+            "USA": "🇺🇸",
+            "UK": "🇬🇧",
+            "Canada": "🇨🇦",
+            "Australia": "🇦🇺",
+            "India": "🇮🇳",
+            "Germany": "🇩🇪",
+            "France": "🇫🇷",
+            "Japan": "🇯🇵",
+            "China": "🇨🇳",
+            "Brazil": "🇧🇷",
+            "Sri Lanka": "🇱🇰",
+            "Other": "🌍"
+        ]
+        return flags[country] ?? "🌍"
     }
     
     var mainMenu: some View {
@@ -54,7 +78,59 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 30) {
+            VStack(spacing: 0) {
+                // Always visible logout button at top-right
+                HStack {
+                    Spacer()
+                    Menu {
+                        // Show current country
+                        if let profile = firebaseManager.userProfile {
+                            Section {
+                                Text("Country: \(profile.country)")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Button(action: {
+                            showCountryPicker = true
+                        }) {
+                            Label("Change Country", systemImage: "flag.fill")
+                        }
+                        
+                        Button(action: {
+                            Task {
+                                await firebaseManager.refreshUserProfile()
+                            }
+                        }) {
+                            Label("Refresh Profile", systemImage: "arrow.clockwise")
+                        }
+                        
+                        Divider()
+                        
+                        Button(role: .destructive, action: {
+                            do {
+                                try firebaseManager.signOut()
+                            } catch {
+                                print("Error signing out: \(error)")
+                            }
+                        }) {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(Circle().fill(Color.white.opacity(0.3)))
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                
+                Spacer().frame(height: 10)
+                
+                ScrollView {
+                    VStack(spacing: 30) {
                 // User Profile Header
                 if let userProfile = firebaseManager.userProfile {
                     HStack {
@@ -63,7 +139,9 @@ struct ContentView: View {
                                 .font(.headline)
                                 .foregroundColor(.white)
                             HStack {
-                                Text("\(userProfile.country)")
+                                Text(getCountryFlag(userProfile.country))
+                                    .font(.caption)
+                                Text(userProfile.country)
                                     .font(.caption)
                                     .foregroundColor(.white.opacity(0.8))
                                 Text("•")
@@ -96,6 +174,48 @@ struct ContentView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.white.opacity(0.2))
+                    )
+                    .padding(.horizontal, 30)
+                    .padding(.top, 10)
+                } else if firebaseManager.isAuthenticated {
+                    // Show logout button even without profile
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Loading profile...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Text("Tap refresh if stuck")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        Spacer()
+                        Button(action: {
+                            Task {
+                                await firebaseManager.refreshUserProfile()
+                            }
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Circle().fill(Color.white.opacity(0.2)))
+                        }
+                        Button(action: {
+                            do {
+                                try firebaseManager.signOut()
+                            } catch {
+                                print("Error signing out: \(error)")
+                            }
+                        }) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Circle().fill(Color.white.opacity(0.2)))
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.orange.opacity(0.3))
                     )
                     .padding(.horizontal, 30)
                     .padding(.top, 10)
@@ -321,13 +441,13 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 30)
                 
-                Spacer()
-                
                 // Footer
                 Text("Made with ❤️ in SwiftUI")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.7))
                     .padding(.bottom, 20)
+                    }
+                }
             }
         }
     }
@@ -375,6 +495,84 @@ struct MenuButton: View {
     }
 }
 
-#Preview {
-    ContentView()
+// MARK: - Country Picker View
+struct CountryPickerView: View {
+    @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var firebaseManager: FirebaseManager
+    
+    let countries = ["USA", "UK", "Canada", "Australia", "India", "Germany", "France", "Japan", "China", "Brazil", "Sri Lanka", "Other"]
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color.blue.opacity(0.3),
+                        Color.purple.opacity(0.3)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                List {
+                    Section {
+                        ForEach(countries, id: \.self) { country in
+                            Button(action: {
+                                Task {
+                                    await firebaseManager.updateUserCountry(country)
+                                    dismiss()
+                                }
+                            }) {
+                                HStack {
+                                    Text(getCountryFlag(country))
+                                        .font(.title2)
+                                    Text(country)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    if firebaseManager.userProfile?.country == country {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Select Your Country")
+                    } footer: {
+                        Text("This will be displayed on leaderboards")
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Change Country")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+    
+    private func getCountryFlag(_ country: String) -> String {
+        let flags: [String: String] = [
+            "USA": "🇺🇸",
+            "UK": "🇬🇧",
+            "Canada": "🇨🇦",
+            "Australia": "🇦🇺",
+            "India": "🇮🇳",
+            "Germany": "🇩🇪",
+            "France": "🇫🇷",
+            "Japan": "🇯🇵",
+            "China": "🇨🇳",
+            "Brazil": "🇧🇷",
+            "Sri Lanka": "🇱🇰",
+            "Other": "🌍"
+        ]
+        return flags[country] ?? "🌍"
+    }
 }
+
