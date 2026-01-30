@@ -224,24 +224,28 @@ struct GameView: View {
             
             Divider()
             
+            // Auto-progress countdown
+            VStack(spacing: 8) {
+                Text("Next level in \(viewModel.autoProgressCountdown)s")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                ProgressView(value: Double(5 - viewModel.autoProgressCountdown), total: 5.0)
+                    .progressViewStyle(.linear)
+                    .tint(.blue)
+            }
+            .padding(.horizontal)
+            
             HStack(spacing: 20) {
-                Button("Next Level") {
-                    if highScoreManager.isHighScore(viewModel.stats.totalScore) {
-                        viewModel.shouldAdvanceAfterNameInput = true
-                        viewModel.showNameInput = true
-                    } else {
-                        viewModel.advanceToNextLevel()
-                    }
+                Button("Next Level Now") {
+                    viewModel.saveScoreToFirebase()
+                    viewModel.advanceToNextLevel()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Menu") {
-                    if highScoreManager.isHighScore(viewModel.stats.totalScore) {
-                        viewModel.shouldAdvanceAfterNameInput = false
-                        viewModel.showNameInput = true
-                    } else {
-                        viewModel.returnToMenu()
-                    }
+                    viewModel.saveScoreToFirebase()
+                    viewModel.returnToMenu()
                 }
                 .buttonStyle(.bordered)
             }
@@ -279,19 +283,28 @@ struct GameView: View {
             
             Divider()
             
+            // Auto-progress countdown
+            VStack(spacing: 8) {
+                Text("Retry in \(viewModel.autoProgressCountdown)s")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                ProgressView(value: Double(5 - viewModel.autoProgressCountdown), total: 5.0)
+                    .progressViewStyle(.linear)
+                    .tint(.orange)
+            }
+            .padding(.horizontal)
+            
             HStack(spacing: 20) {
-                Button("Retry") {
+                Button("Retry Now") {
+                    viewModel.saveScoreToFirebase()
                     viewModel.restartCurrentLevel()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Menu") {
-                    if highScoreManager.isHighScore(viewModel.stats.totalScore) {
-                        viewModel.shouldAdvanceAfterNameInput = false
-                        viewModel.showNameInput = true
-                    } else {
-                        viewModel.returnToMenu()
-                    }
+                    viewModel.saveScoreToFirebase()
+                    viewModel.returnToMenu()
                 }
                 .buttonStyle(.bordered)
             }

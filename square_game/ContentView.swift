@@ -3,9 +3,12 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = GameViewModel()
     @StateObject private var highScoreManager = HighScoreManager()
+    @EnvironmentObject var firebaseManager: FirebaseManager
     
     @State private var showHighScores = false
     @State private var showInfo = false
+    @State private var showLeaderboard = false
+    @State private var showAchievements = false
     
     var body: some View {
         ZStack {
@@ -20,6 +23,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showInfo) {
             InfoView()
+        }
+        .sheet(isPresented: $showLeaderboard) {
+            LeaderboardView()
+                .environmentObject(firebaseManager)
+        }
+        .sheet(isPresented: $showAchievements) {
+            AchievementsView()
+                .environmentObject(firebaseManager)
         }
     }
     
@@ -38,6 +49,52 @@ struct ContentView: View {
             .ignoresSafeArea()
             
             VStack(spacing: 30) {
+                // User Profile Header
+                if let userProfile = firebaseManager.userProfile {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Welcome, \(userProfile.username)!")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            HStack {
+                                Text("\(userProfile.country)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.8))
+                                Text("•")
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text("Lvl \(userProfile.highestLevel)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.8))
+                                Text("•")
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text("\(userProfile.totalScore) pts")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                        Spacer()
+                        Button(action: {
+                            do {
+                                try firebaseManager.signOut()
+                            } catch {
+                                print("Error signing out: \(error)")
+                            }
+                        }) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Circle().fill(Color.white.opacity(0.2)))
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white.opacity(0.2))
+                    )
+                    .padding(.horizontal, 30)
+                    .padding(.top, 10)
+                }
+                
                 Spacer()
                 
                 // Title
@@ -172,9 +229,75 @@ struct ContentView: View {
                     )
                     .padding(.horizontal, 30)
                     
+                    // Firebase Leaderboards and Achievements
+                    VStack(spacing: 12) {
+                        HStack {
+                            Image(systemName: "cloud.fill")
+                                .font(.title3)
+                                .foregroundColor(.white)
+                            Text("Online Features")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                showLeaderboard = true
+                            }) {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "chart.bar.fill")
+                                        .font(.system(size: 28))
+                                    Text("Leaderboard")
+                                        .font(.subheadline)
+                                        .bold()
+                                    Text("Global & Regional")
+                                        .font(.caption2)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.green.gradient)
+                                        .shadow(color: Color.green.opacity(0.5), radius: 5, x: 0, y: 3)
+                                )
+                            }
+                            
+                            Button(action: {
+                                showAchievements = true
+                            }) {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "rosette")
+                                        .font(.system(size: 28))
+                                    Text("Achievements")
+                                        .font(.subheadline)
+                                        .bold()
+                                    Text("Track Progress")
+                                        .font(.caption2)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.yellow.gradient)
+                                        .shadow(color: Color.yellow.opacity(0.5), radius: 5, x: 0, y: 3)
+                                )
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 15)
+                            .fill(Color.white.opacity(0.15))
+                    )
+                    .padding(.horizontal, 30)
+                    
                     MenuButton(
                         icon: "trophy.circle.fill",
-                        title: "High Scores",
+                        title: "Local High Scores",
                         subtitle: "View Top Players",
                         color: .orange
                     ) {

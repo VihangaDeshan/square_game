@@ -9,11 +9,18 @@ class GameViewModel: ObservableObject {
     @Published var levelConfig: LevelConfig = LevelConfig(level: 1)
     @Published var showNameInput: Bool = false
     @Published var shouldAdvanceAfterNameInput: Bool = false
+    @Published var autoProgressCountdown: Int = 5
+    @Published var newAchievements: [Achievement] = []
+    @Published var showAchievementPopup: Bool = false
     
     // MARK: - Private Properties
     private var firstSelectedIndex: Int? = nil
     private var isBusy: Bool = false
     private var timer: AnyCancellable?
+    private var autoProgressTimer: AnyCancellable?
+    private var perfectGameAchieved: Bool = false
+    private var usedBonusLife: Bool = false
+    private var timeRemainingAtEnd: Int = 0
     
     let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .yellow, .cyan, .mint, .indigo, .teal, .brown]
     
@@ -190,13 +197,20 @@ class GameViewModel: ObservableObject {
         if stats.matchesFound == totalPairs {
             stopTimer()
             
+            // Track time remaining for achievements
+            timeRemainingAtEnd = stats.timeRemaining
+            
             // Check if player achieved perfect score (4 moves) and award bonus life
             if levelConfig.mode == .score && stats.turns == LevelConfig.perfectTurns {
                 stats.bonusLives += 1 // Award bonus life for perfect game
+                perfectGameAchieved = true
             }
             
             calculateScore()
             gameState = .won
+            
+            // Start auto-progress timer
+            startAutoProgressTimer()
         }
     }
     
@@ -212,13 +226,7 @@ class GameViewModel: ObservableObject {
     
     private func handleTimeOut() {
         stopTimer()
-        handleGameOver()
-    }
-    
-    private func handleGameOver() {
-        if stats.bonusLives > 0 {
-            // Use bonus life
-            stats.bonusLives -= 1
+        handusedBonusLife = true
             
             if levelConfig.mode == .score {
                 // Grant 2 extra turns
@@ -229,6 +237,16 @@ class GameViewModel: ObservableObject {
                 }
             } else {
                 // Grant 10 extra seconds
+                stats.timeRemaining = 10
+                startTimer()
+            }
+        } else {
+            stopTimer()
+            calculateScore()
+            gameState = .lost
+            
+            // Start auto-progress timer for retry
+            startAutoProgressTimer()xtra seconds
                 stats.timeRemaining = 10
                 startTimer()
             }
@@ -264,27 +282,35 @@ class GameViewModel: ObservableObject {
         let levelBonus = stats.currentLevel * 50
         
         stats.totalScore = baseScore + bonus + levelBonus
-    }
-    
-    // MARK: - Level Progression
-    func advanceToNextLevel() {
+    }opAutoProgressTimer()
         stats.currentLevel += 1
         stats.bonusLives = 1 // Reset bonus life for new level
         let currentMode = levelConfig.mode
+        perfectGameAchieved = false
+        usedBonusLife = false
+        timeRemainingAtEnd = 0
         startNewGame(level: stats.currentLevel, mode: currentMode)
     }
     
     func restartCurrentLevel() {
+        stopAutoProgressTimer()
         stats.bonusLives = 1
         let currentMode = levelConfig.mode
+        perfectGameAchieved = false
+        usedBonusLife = false
+        timeRemainingAtEnd = 0
         startNewGame(level: stats.currentLevel, mode: currentMode)
     }
     
     func returnToMenu() {
         stopTimer()
+        stopAutoProgressTimer()
         gameState = .menu
         stats = GameStats()
         cards = []
+        perfectGameAchieved = false
+        usedBonusLife = false
+        timeRemainingAtEnd = 0
     }
     
     // MARK: - Mode Selection
@@ -292,6 +318,118 @@ class GameViewModel: ObservableObject {
         switch mode {
         case .score:
             startNewGame(level: 1, mode: .score)
+        case .time:
+            startNewGame(level: 1, mode: .time)
+        case .difficult:
+            startNewGame(level: 1, mode: .difficult)
+        }
+    }
+    
+    // MARK: - Auto Progress Timer
+    private func startAutoProgressTimer() {
+        autoProgressCountdown = 5
+        autoProgressTimer?.cancel()
+        
+        autoProgressTimer = Timer.publish(every: 1.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                if self.autoProgressCountdown > 0 {
+                    self.autoProgressCountdown -= 1
+                } else {
+                    self.handleAutoProgress()
+                }
+            }
+    }
+    
+    private func stopAutoProgressTimer() {
+        autoProgressTimer?.cancel()
+        autoProgressTimer = nil
+        autoProgressCountdown = 5
+    }
+    
+    private func handleAutoProgress() {
+        stopAutoProgressTimer()
+        
+        if gameState == .won {
+            // Check for achievements before advancing
+            checkAndUnlockAchievements()
+            advanceToNextLevel()
+        } else if gameState == .lost {
+            restartCurrentLevel()
+        }
+    }
+    
+    // MARK: - Achievement Tracking
+    func checkAndUnlockAchievements() {
+        var unlockedAchievements: [Achievement] = []
+        
+        // Perfect Game Achievement
+        if perfectGameAchieved {
+            let achievement = Achievement(
+                id: "perfect_game",
+                title: "Perfect Memory",
+                description: "Complete a level with perfect score (4 turns)",
+                icon: "crown.fill",
+                requirement: 1,
+                type: .perfectGame,
+                isUnlocked: true,
+                unlockedAt: Date()
+            )
+            unlockedAchievements.append(achievement)
+        }
+        
+        // Time Wizard Achievement
+        if timeRemainingAtEnd >= 20 && (levelConfig.mode == .time || levelConfig.mode == .difficult) {
+            let achievement = Achievement(
+                id: "time_wizard",
+                title: "Time Wizard",
+                description: "Finish with 20+ seconds remaining",
+                icon: "clock.fill",
+                requirement: 1,
+                type: .timeWizard,
+                isUnlocked: true,
+                unlockedAt: Date()
+            )
+            unlockedAchievements.append(achievement)
+        }
+        
+        // Survivor Achievement
+        if usedBonusLife {
+            let achievement = Achievement(
+                id: "survivor",
+                title: "Survivor",
+                description: "Use a bonus life and win",
+                icon: "shield.fill",
+                requirement: 1,
+                type: .survivor,
+                isUnlocked: true,
+                unlockedAt: Date()
+            )
+            unlockedAchievements.append(achievement)
+        }
+        
+        if !unlockedAchievements.isEmpty {
+            newAchievements = unlockedAchievements
+            
+            // Upload to Firebase
+            Task {
+                for achievement in unlockedAchievements {
+                    await FirebaseManager.shared.unlockAchievement(achievement.id)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Save Score to Firebase
+    func saveScoreToFirebase() {
+        Task {
+            await FirebaseManager.shared.updateUserStats(
+                score: stats.totalScore,
+                level: stats.currentLevel,
+                mode: levelConfig.mode
+            
         case .time:
             startNewGame(level: 1, mode: .time)
         case .difficult:
