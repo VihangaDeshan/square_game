@@ -197,6 +197,22 @@ struct AchievementCardView: View {
             return Color(red: 0.5, green: 0.0, blue: 0.5)
         case .timeWizard:
             return .mint
+        case .dailyStreak:
+            return .orange
+        case .winStreak:
+            return .red
+        case .comboMaster:
+            return Color(red: 1.0, green: 0.5, blue: 0.0)
+        case .speedDemon:
+            return .yellow
+        case .nightOwl:
+            return Color(red: 0.4, green: 0.2, blue: 0.6)
+        case .earlyBird:
+            return Color(red: 1.0, green: 0.8, blue: 0.0)
+        case .centurion:
+            return Color(red: 0.7, green: 0.5, blue: 0.3)
+        case .grandMaster:
+            return Color(red: 1.0, green: 0.84, blue: 0.0)
         }
     }
 }

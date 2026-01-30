@@ -16,6 +16,9 @@ struct UserProfile: Codable, Identifiable {
     var achievements: [String]
     var createdAt: Date
     var lastPlayed: Date
+    var currentStreak: Int
+    var bestStreak: Int
+    var consecutiveWins: Int
 }
 
 // MARK: - Score Entry Model
@@ -61,6 +64,14 @@ enum AchievementType: String, Codable {
     case survivor = "survivor"
     case difficultChampion = "difficult_champion"
     case timeWizard = "time_wizard"
+    case dailyStreak = "daily_streak"
+    case winStreak = "win_streak"
+    case comboMaster = "combo_master"
+    case speedDemon = "speed_demon"
+    case nightOwl = "night_owl"
+    case earlyBird = "early_bird"
+    case centurion = "centurion"
+    case grandMaster = "grand_master"
 }
 
 // MARK: - Firebase Authentication Manager
@@ -116,7 +127,10 @@ class FirebaseManager: ObservableObject {
                 highestLevel: 1,
                 achievements: [],
                 createdAt: Date(),
-                lastPlayed: Date()
+                lastPlayed: Date(),
+                currentStreak: 0,
+                bestStreak: 0,
+                consecutiveWins: 0
             )
             
             print("💾 Saving user profile to Firestore...")
@@ -199,7 +213,10 @@ class FirebaseManager: ObservableObject {
                 highestLevel: data["highestLevel"] as? Int ?? 1,
                 achievements: data["achievements"] as? [String] ?? [],
                 createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
-                lastPlayed: (data["lastPlayed"] as? Timestamp)?.dateValue() ?? Date()
+                lastPlayed: (data["lastPlayed"] as? Timestamp)?.dateValue() ?? Date(),
+                currentStreak: data["currentStreak"] as? Int ?? 0,
+                bestStreak: data["bestStreak"] as? Int ?? 0,
+                consecutiveWins: data["consecutiveWins"] as? Int ?? 0
             )
             
             if let profile = userProfile {
@@ -250,7 +267,10 @@ class FirebaseManager: ObservableObject {
             highestLevel: 1,
             achievements: [],
             createdAt: Date(),
-            lastPlayed: Date()
+            lastPlayed: Date(),
+            currentStreak: 0,
+            bestStreak: 0,
+            consecutiveWins: 0
         )
         
         do {
@@ -292,7 +312,10 @@ class FirebaseManager: ObservableObject {
             "highestLevel": profile.highestLevel,
             "achievements": profile.achievements,
             "createdAt": Timestamp(date: profile.createdAt),
-            "lastPlayed": Timestamp(date: profile.lastPlayed)
+            "lastPlayed": Timestamp(date: profile.lastPlayed),
+            "currentStreak": profile.currentStreak,
+            "bestStreak": profile.bestStreak,
+            "consecutiveWins": profile.consecutiveWins
         ]
         
         try await db.collection("users").document(profile.id).setData(data)
@@ -309,13 +332,43 @@ class FirebaseManager: ObservableObject {
         profile.totalScore += score
         profile.gamesPlayed += 1
         profile.highestLevel = max(profile.highestLevel, level)
+        
+        // Update streak tracking
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let lastPlayedDay = calendar.startOfDay(for: profile.lastPlayed)
+        let daysDifference = calendar.dateComponents([.day], from: lastPlayedDay, to: today).day ?? 0
+        
+        if daysDifference == 0 {
+            // Same day - streak continues
+            print("📅 Playing same day - streak maintained: \(profile.currentStreak)")
+        } else if daysDifference == 1 {
+            // Next day - increment streak
+            profile.currentStreak += 1
+            profile.bestStreak = max(profile.bestStreak, profile.currentStreak)
+            print("🔥 Streak increased to: \(profile.currentStreak) (Best: \(profile.bestStreak))")
+        } else {
+            // Streak broken
+            print("💔 Streak broken! Was: \(profile.currentStreak), starting over")
+            profile.currentStreak = 1
+        }
+        
+        // Update consecutive wins (simplified - assumes score > 0 is a win)
+        if score > 0 {
+            profile.consecutiveWins += 1
+            print("🏆 Win streak: \(profile.consecutiveWins)")
+        } else {
+            profile.consecutiveWins = 0
+            print("❌ Win streak reset")
+        }
+        
         profile.lastPlayed = Date()
         
         do {
             print("💾 Saving updated profile...")
             try await saveUserProfile(profile)
             userProfile = profile
-            print("✅ Profile saved. Total score: \(profile.totalScore), Games: \(profile.gamesPlayed)")
+            print("✅ Profile saved. Total score: \(profile.totalScore), Games: \(profile.gamesPlayed), Streak: \(profile.currentStreak)")
             
             // Save score to leaderboard
             print("🏆 Saving score to leaderboard...")
@@ -436,6 +489,7 @@ class FirebaseManager: ObservableObject {
     // MARK: - Achievements System
     func getDefaultAchievements() -> [Achievement] {
         return [
+            // Original Achievements
             Achievement(id: "first_win", title: "First Victory", description: "Complete your first level", icon: "star.fill", requirement: 1, type: .firstWin, isUnlocked: false),
             Achievement(id: "perfect_game", title: "Perfect Memory", description: "Complete a level with perfect score (4 turns)", icon: "crown.fill", requirement: 1, type: .perfectGame, isUnlocked: false),
             Achievement(id: "speedster", title: "Speedster", description: "Complete 5 time mode levels", icon: "bolt.fill", requirement: 5, type: .speedster, isUnlocked: false),
@@ -445,7 +499,17 @@ class FirebaseManager: ObservableObject {
             Achievement(id: "match_maker", title: "Match Maker", description: "Find 500 matches", icon: "heart.fill", requirement: 500, type: .matchMaker, isUnlocked: false),
             Achievement(id: "survivor", title: "Survivor", description: "Use all bonus lives in a single game", icon: "shield.fill", requirement: 1, type: .survivor, isUnlocked: false),
             Achievement(id: "difficult_champion", title: "Difficult Champion", description: "Complete 10 difficult mode levels", icon: "flame.fill", requirement: 10, type: .difficultChampion, isUnlocked: false),
-            Achievement(id: "time_wizard", title: "Time Wizard", description: "Finish with 20+ seconds remaining", icon: "clock.fill", requirement: 1, type: .timeWizard, isUnlocked: false)
+            Achievement(id: "time_wizard", title: "Time Wizard", description: "Finish with 20+ seconds remaining", icon: "clock.fill", requirement: 1, type: .timeWizard, isUnlocked: false),
+            
+            // NEW Streak & Special Achievements
+            Achievement(id: "daily_streak", title: "Daily Dedication", description: "Play 3 days in a row", icon: "calendar.badge.clock", requirement: 3, type: .dailyStreak, isUnlocked: false),
+            Achievement(id: "win_streak", title: "On Fire", description: "Win 5 games in a row", icon: "flame.circle.fill", requirement: 5, type: .winStreak, isUnlocked: false),
+            Achievement(id: "combo_master", title: "Combo Master", description: "Get a 10-day streak", icon: "sparkles", requirement: 10, type: .comboMaster, isUnlocked: false),
+            Achievement(id: "speed_demon", title: "Speed Demon", description: "Complete level 5+ in under 20 seconds", icon: "hare.fill", requirement: 1, type: .speedDemon, isUnlocked: false),
+            Achievement(id: "night_owl", title: "Night Owl", description: "Play between 11 PM - 5 AM", icon: "moon.stars.fill", requirement: 1, type: .nightOwl, isUnlocked: false),
+            Achievement(id: "early_bird", title: "Early Bird", description: "Play between 5 AM - 7 AM", icon: "sunrise.fill", requirement: 1, type: .earlyBird, isUnlocked: false),
+            Achievement(id: "centurion", title: "Centurion", description: "Play 100 games", icon: "rosette", requirement: 100, type: .centurion, isUnlocked: false),
+            Achievement(id: "grand_master", title: "Grand Master", description: "Reach level 20", icon: "trophy.fill", requirement: 20, type: .grandMaster, isUnlocked: false)
         ]
     }
     
@@ -472,6 +536,12 @@ class FirebaseManager: ObservableObject {
             print("🎉 Unlocked: Level Master!")
         }
         
+        // Grand Master
+        if !profile.achievements.contains("grand_master") && level >= 20 {
+            newAchievements.append("grand_master")
+            print("🎉 Unlocked: Grand Master!")
+        }
+        
         // Score Hunter
         if !profile.achievements.contains("score_hunter") && profile.totalScore >= 10000 {
             newAchievements.append("score_hunter")
@@ -482,6 +552,45 @@ class FirebaseManager: ObservableObject {
         if !profile.achievements.contains("marathon_runner") && profile.gamesPlayed >= 50 {
             newAchievements.append("marathon_runner")
             print("🎉 Unlocked: Marathon Runner!")
+        }
+        
+        // Centurion
+        if !profile.achievements.contains("centurion") && profile.gamesPlayed >= 100 {
+            newAchievements.append("centurion")
+            print("🎉 Unlocked: Centurion!")
+        }
+        
+        // Daily Streak
+        if !profile.achievements.contains("daily_streak") && profile.currentStreak >= 3 {
+            newAchievements.append("daily_streak")
+            print("🎉 Unlocked: Daily Dedication!")
+        }
+        
+        // Combo Master (10-day streak)
+        if !profile.achievements.contains("combo_master") && profile.currentStreak >= 10 {
+            newAchievements.append("combo_master")
+            print("🎉 Unlocked: Combo Master!")
+        }
+        
+        // Win Streak
+        if !profile.achievements.contains("win_streak") && profile.consecutiveWins >= 5 {
+            newAchievements.append("win_streak")
+            print("🎉 Unlocked: On Fire!")
+        }
+        
+        // Time-based achievements
+        let hour = Calendar.current.component(.hour, from: Date())
+        
+        // Night Owl (11 PM - 5 AM)
+        if !profile.achievements.contains("night_owl") && (hour >= 23 || hour < 5) {
+            newAchievements.append("night_owl")
+            print("🎉 Unlocked: Night Owl!")
+        }
+        
+        // Early Bird (5 AM - 7 AM)
+        if !profile.achievements.contains("early_bird") && hour >= 5 && hour < 7 {
+            newAchievements.append("early_bird")
+            print("🎉 Unlocked: Early Bird!")
         }
         
         if !newAchievements.isEmpty {
