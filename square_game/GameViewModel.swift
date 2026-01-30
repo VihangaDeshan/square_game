@@ -2,6 +2,8 @@ import SwiftUI
 import Combine
 
 class GameViewModel: ObservableObject {
+    // MARK: - Accessibility
+    private let accessibility = AccessibilityManager.shared
     // MARK: - Published Properties
     @Published var cards: [Card] = []
     @Published var gameState: GameState = .menu
@@ -9,11 +11,18 @@ class GameViewModel: ObservableObject {
     @Published var levelConfig: LevelConfig = LevelConfig(level: 1)
     @Published var showNameInput: Bool = false
     @Published var shouldAdvanceAfterNameInput: Bool = false
+    @Published var autoProgressCountdown: Int = 5
+    @Published var newAchievements: [Achievement] = []
+    @Published var showAchievementPopup: Bool = false
     
     // MARK: - Private Properties
     private var firstSelectedIndex: Int? = nil
     private var isBusy: Bool = false
     private var timer: AnyCancellable?
+    private var autoProgressTimer: AnyCancellable?
+    private var perfectGameAchieved: Bool = false
+    private var usedBonusLife: Bool = false
+    private var timeRemainingAtEnd: Int = 0
     
     let colors: [Color] = [.blue, .red, .green, .orange, .purple, .pink, .yellow, .cyan, .mint, .indigo, .teal, .brown]
     
@@ -108,7 +117,9 @@ class GameViewModel: ObservableObject {
               !cards[index].isMatched,
               !cards[index].isBonus else { return }
         
-        withAnimation(.spring(response: 0.3)) {
+        accessibility.playCardFlipSound()
+        
+        withAnimation(.spring(response: accessibility.getAnimationDuration(0.3))) {
             cards[index].isFlipped = true
         }
         
@@ -125,6 +136,9 @@ class GameViewModel: ObservableObject {
     private func checkForMatch(first: Int, second: Int) {
         if cards[first].colorIndex == cards[second].colorIndex {
             // Match found
+            accessibility.playMatchSound()
+            accessibility.announce("Match found! \(stats.matchesFound + 1) matches")
+            
             cards[first].isMatched = true
             cards[second].isMatched = true
             stats.matchesFound += 1
@@ -138,6 +152,7 @@ class GameViewModel: ObservableObject {
             checkWinCondition()
         } else {
             // No match - flip back after delay
+            accessibility.playMismatchSound()
             isBusy = true
             firstSelectedIndex = nil
             
@@ -190,13 +205,29 @@ class GameViewModel: ObservableObject {
         if stats.matchesFound == totalPairs {
             stopTimer()
             
+            // Track time remaining for achievements
+            timeRemainingAtEnd = stats.timeRemaining
+            
             // Check if player achieved perfect score (4 moves) and award bonus life
             if levelConfig.mode == .score && stats.turns == LevelConfig.perfectTurns {
                 stats.bonusLives += 1 // Award bonus life for perfect game
+                perfectGameAchieved = true
             }
             
             calculateScore()
             gameState = .won
+            
+            // Accessibility feedback
+            accessibility.playLevelCompleteSound()
+            if perfectGameAchieved {
+                accessibility.announce("Perfect game! Bonus life earned. Level complete!")
+            } else {
+                accessibility.announce("Level complete! Score: \(stats.totalScore)")
+            }
+            accessibility.announceScreenChange()
+            
+            // Start auto-progress timer
+            startAutoProgressTimer()
         }
     }
     
@@ -210,15 +241,27 @@ class GameViewModel: ObservableObject {
         }
     }
     
-    private func handleTimeOut() {
+    private func handleGameOver() {
         stopTimer()
-        handleGameOver()
+        calculateScore()
+        gameState = .lost
+        
+        accessibility.playErrorHaptic()
+        accessibility.announce("Game over. Final score: \(stats.totalScore)")
+        accessibility.announceScreenChange()
+        
+        startAutoProgressTimer()
     }
     
-    private func handleGameOver() {
-        if stats.bonusLives > 0 {
-            // Use bonus life
+    private func handleTimeOut() {
+        stopTimer()
+        
+        // Check if player has a bonus life
+        if stats.bonusLives > 0 && !usedBonusLife {
             stats.bonusLives -= 1
+            usedBonusLife = true
+            
+            accessibility.playWarningHaptic()
             
             if levelConfig.mode == .score {
                 // Grant 2 extra turns
@@ -227,15 +270,24 @@ class GameViewModel: ObservableObject {
                     // Temporarily increase max turns
                     stats.turns = maxTurns - 2
                 }
+                accessibility.announce("Bonus life used! You have \(stats.bonusLives) lives remaining. 2 extra turns granted.")
             } else {
                 // Grant 10 extra seconds
                 stats.timeRemaining = 10
                 startTimer()
+                accessibility.announce("Bonus life used! You have \(stats.bonusLives) lives remaining. 10 extra seconds granted.")
             }
         } else {
             stopTimer()
             calculateScore()
             gameState = .lost
+            
+            accessibility.playErrorHaptic()
+            accessibility.announce("Time's up! Final score: \(stats.totalScore)")
+            accessibility.announceScreenChange()
+            
+            // Start auto-progress timer for retry
+            startAutoProgressTimer()
         }
     }
     
@@ -266,25 +318,36 @@ class GameViewModel: ObservableObject {
         stats.totalScore = baseScore + bonus + levelBonus
     }
     
-    // MARK: - Level Progression
     func advanceToNextLevel() {
+        stopAutoProgressTimer()
         stats.currentLevel += 1
         stats.bonusLives = 1 // Reset bonus life for new level
         let currentMode = levelConfig.mode
+        perfectGameAchieved = false
+        usedBonusLife = false
+        timeRemainingAtEnd = 0
         startNewGame(level: stats.currentLevel, mode: currentMode)
     }
     
     func restartCurrentLevel() {
+        stopAutoProgressTimer()
         stats.bonusLives = 1
         let currentMode = levelConfig.mode
+        perfectGameAchieved = false
+        usedBonusLife = false
+        timeRemainingAtEnd = 0
         startNewGame(level: stats.currentLevel, mode: currentMode)
     }
     
     func returnToMenu() {
         stopTimer()
+        stopAutoProgressTimer()
         gameState = .menu
         stats = GameStats()
         cards = []
+        perfectGameAchieved = false
+        usedBonusLife = false
+        timeRemainingAtEnd = 0
     }
     
     // MARK: - Mode Selection
@@ -296,6 +359,168 @@ class GameViewModel: ObservableObject {
             startNewGame(level: 1, mode: .time)
         case .difficult:
             startNewGame(level: 1, mode: .difficult)
+        }
+    }
+    
+    // MARK: - Auto Progress Timer
+    private func startAutoProgressTimer() {
+        autoProgressCountdown = 5
+        autoProgressTimer?.cancel()
+        
+        autoProgressTimer = Timer.publish(every: 1.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                if self.autoProgressCountdown > 0 {
+                    self.autoProgressCountdown -= 1
+                } else {
+                    self.handleAutoProgress()
+                }
+            }
+    }
+    
+    private func stopAutoProgressTimer() {
+        autoProgressTimer?.cancel()
+        autoProgressTimer = nil
+        autoProgressCountdown = 5
+    }
+    
+    private func handleAutoProgress() {
+        stopAutoProgressTimer()
+        
+        if gameState == .won {
+            // Check for achievements before advancing
+            checkAndUnlockAchievements()
+            advanceToNextLevel()
+        } else if gameState == .lost {
+            restartCurrentLevel()
+        }
+    }
+    
+    // MARK: - Achievement Tracking
+    func checkAndUnlockAchievements() {
+        var unlockedAchievements: [Achievement] = []
+        
+        // Perfect Game Achievement
+        if perfectGameAchieved {
+            let achievement = Achievement(
+                id: "perfect_game",
+                title: "Perfect Memory",
+                description: "Complete a level with perfect score (4 turns)",
+                icon: "crown.fill",
+                requirement: 1,
+                type: .perfectGame,
+                isUnlocked: true,
+                unlockedAt: Date()
+            )
+            unlockedAchievements.append(achievement)
+        }
+        
+        // Time Wizard Achievement
+        if timeRemainingAtEnd >= 20 && (levelConfig.mode == .time || levelConfig.mode == .difficult) {
+            let achievement = Achievement(
+                id: "time_wizard",
+                title: "Time Wizard",
+                description: "Finish with 20+ seconds remaining",
+                icon: "clock.fill",
+                requirement: 1,
+                type: .timeWizard,
+                isUnlocked: true,
+                unlockedAt: Date()
+            )
+            unlockedAchievements.append(achievement)
+        }
+        
+        // Survivor Achievement
+        if usedBonusLife {
+            let achievement = Achievement(
+                id: "survivor",
+                title: "Survivor",
+                description: "Use a bonus life and win",
+                icon: "shield.fill",
+                requirement: 1,
+                type: .survivor,
+                isUnlocked: true,
+                unlockedAt: Date()
+            )
+            unlockedAchievements.append(achievement)
+        }
+        
+        if !unlockedAchievements.isEmpty {
+            newAchievements = unlockedAchievements
+            
+            // Upload to Firebase
+            Task {
+                for achievement in unlockedAchievements {
+                    await FirebaseManager.shared.unlockAchievement(achievement.id)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Save Score
+    func saveScore(to highScoreManager: HighScoreManager) {
+        // CRITICAL: Capture values immediately before any async operations
+        let finalScore = stats.totalScore
+        let finalLevel = stats.currentLevel
+        let gameMode = levelConfig.mode
+        
+        print("🎮 saveScore called: score=\(finalScore), level=\(finalLevel), mode=\(gameMode)")
+        
+        // Always save to local high scores first
+        if finalScore > 0 {
+            let playerName = FirebaseManager.shared.userProfile?.username ?? "Player"
+            let entry = HighScoreEntry(
+                playerName: playerName,
+                score: finalScore,
+                level: finalLevel,
+                date: Date()
+            )
+            print("💾 Saving local high score: \(finalScore) for \(playerName)")
+            highScoreManager.saveHighScore(entry)
+            print("✅ Local score saved")
+        }
+        
+        // Save to Firebase if authenticated - using captured values
+        Task {
+            // Check if user has profile, if not create one
+            if FirebaseManager.shared.currentUser != nil && FirebaseManager.shared.userProfile == nil {
+                print("⚠️ User authenticated but no profile - attempting to create...")
+                await FirebaseManager.shared.createMissingProfile()
+            }
+            
+            await FirebaseManager.shared.updateUserStats(
+                score: finalScore,
+                level: finalLevel,
+                mode: gameMode
+            )
+        }
+    }
+    
+    // MARK: - Save Score to Firebase (deprecated)
+    func saveScoreToFirebase() {
+        // CRITICAL: Capture values immediately before any async operations
+        let finalScore = stats.totalScore
+        let finalLevel = stats.currentLevel
+        let gameMode = levelConfig.mode
+        
+        print("⚠️ saveScoreToFirebase is deprecated")
+        print("🎮 saveScoreToFirebase called: score=\(finalScore), level=\(finalLevel), mode=\(gameMode)")
+        
+        // Save to Firebase if authenticated
+        Task {
+            // Check if user has profile, if not create one
+            if FirebaseManager.shared.currentUser != nil && FirebaseManager.shared.userProfile == nil {
+                print("⚠️ User authenticated but no profile - attempting to create...")
+                await FirebaseManager.shared.createMissingProfile()
+            }
+            
+            await FirebaseManager.shared.updateUserStats(
+                score: finalScore,
+                level: finalLevel,
+                mode: gameMode
+            )
         }
     }
 }

@@ -36,6 +36,8 @@ struct HighScoresView: View {
                         Button("Clear All", role: .destructive) {
                             highScoreManager.clearAllScores()
                         }
+                        .accessibilityLabel("Clear all high scores")
+                        .accessibilityHint("Deletes all saved high scores")
                     }
                 }
             }
@@ -127,6 +129,8 @@ struct HighScoreRow: View {
             }
         }
         .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Rank \(rank), \(entry.playerName), Score: \(entry.score) points, Level \(entry.level), Date: \(entry.date.formatted(date: .abbreviated, time: .omitted))")
     }
     
     var rankColor: Color {

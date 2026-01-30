@@ -3,6 +3,7 @@ import SwiftUI
 struct GameView: View {
     @ObservedObject var viewModel: GameViewModel
     @ObservedObject var highScoreManager: HighScoreManager
+    @EnvironmentObject var accessibilityManager: AccessibilityManager
     
     var body: some View {
         ZStack {
@@ -27,10 +28,13 @@ struct GameView: View {
                 // Controls
                 if viewModel.gameState == .playing || viewModel.gameState == .peeking {
                     Button("Exit to Menu") {
+                        accessibilityManager.playButtonTapSound()
                         viewModel.returnToMenu()
                     }
                     .buttonStyle(.bordered)
                     .tint(.red)
+                    .accessibilityLabel("Exit to menu")
+                    .accessibilityHint("Returns to main menu")
                 }
             }
             .padding()
@@ -61,6 +65,7 @@ struct GameView: View {
                 VStack(alignment: .leading) {
                     Text("Level \(viewModel.stats.currentLevel)")
                         .font(.title2).bold()
+                        .accessibilityLabel("Level \(viewModel.stats.currentLevel)")
                     HStack(spacing: 4) {
                         Text(viewModel.levelConfig.mode.description)
                             .font(.caption)
@@ -75,6 +80,7 @@ struct GameView: View {
                                 .bold()
                         }
                     }
+                    .accessibilityLabel("Game mode: \(viewModel.levelConfig.mode.description)")
                 }
                 
                 Spacer()
@@ -82,9 +88,11 @@ struct GameView: View {
                 VStack(alignment: .trailing) {
                     Text("Lives: \(String(repeating: "🌟", count: viewModel.stats.bonusLives))")
                         .font(.headline)
+                        .accessibilityLabel("Lives: \(viewModel.stats.bonusLives)")
                     let totalPairs = (viewModel.gridSize * viewModel.gridSize) / 2
                     Text("Matches: \(viewModel.stats.matchesFound)/\(totalPairs)")
                         .font(.caption)
+                        .accessibilityLabel("Matches found: \(viewModel.stats.matchesFound) out of \(totalPairs)")
                 }
             }
             
@@ -98,6 +106,7 @@ struct GameView: View {
                             .foregroundColor(.secondary)
                         Text("\(viewModel.stats.turns)/\(viewModel.levelConfig.maxTurns ?? 0)")
                             .font(.title3).bold()
+                            .accessibilityLabel("Turns used: \(viewModel.stats.turns) out of \(viewModel.levelConfig.maxTurns ?? 0)")
                             .foregroundColor(turnsColor)
                     }
                 } else {
@@ -167,6 +176,9 @@ struct GameView: View {
                     card: card,
                     color: card.colorIndex == -1 ? .clear : viewModel.colors[card.colorIndex % viewModel.colors.count]
                 )
+                .accessibilityLabel(card.isFlipped ? "Card at position \(index + 1), showing color" : "Card at position \(index + 1), hidden")
+                .accessibilityHint(card.isFlipped ? "" : "Double tap to reveal")
+                .accessibilityAddTraits(.isButton)
                 .onTapGesture {
                     viewModel.handleCardTap(at: index)
                 }
@@ -189,6 +201,8 @@ struct GameView: View {
                 .fill(Color.white)
                 .shadow(radius: 10)
         )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Memorize the colors. Game starts in 3 seconds")
     }
     
     var winOverlay: some View {
@@ -224,26 +238,36 @@ struct GameView: View {
             
             Divider()
             
+            // Auto-progress countdown
+            VStack(spacing: 8) {
+                Text("Next level in \(viewModel.autoProgressCountdown)s")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                ProgressView(value: Double(5 - viewModel.autoProgressCountdown), total: 5.0)
+                    .progressViewStyle(.linear)
+                    .tint(.blue)
+            }
+            .padding(.horizontal)
+            
             HStack(spacing: 20) {
-                Button("Next Level") {
-                    if highScoreManager.isHighScore(viewModel.stats.totalScore) {
-                        viewModel.shouldAdvanceAfterNameInput = true
-                        viewModel.showNameInput = true
-                    } else {
-                        viewModel.advanceToNextLevel()
-                    }
+                Button("Next Level Now") {
+                    accessibilityManager.playButtonTapSound()
+                    viewModel.saveScore(to: highScoreManager)
+                    viewModel.advanceToNextLevel()
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityLabel("Next level now")
+                .accessibilityHint("Proceed to level \(viewModel.stats.currentLevel + 1)")
                 
                 Button("Menu") {
-                    if highScoreManager.isHighScore(viewModel.stats.totalScore) {
-                        viewModel.shouldAdvanceAfterNameInput = false
-                        viewModel.showNameInput = true
-                    } else {
-                        viewModel.returnToMenu()
-                    }
+                    accessibilityManager.playButtonTapSound()
+                    viewModel.saveScore(to: highScoreManager)
+                    viewModel.returnToMenu()
                 }
                 .buttonStyle(.bordered)
+                .accessibilityLabel("Return to menu")
+                .accessibilityHint("Save score and return to main menu")
             }
         }
         .padding(40)
@@ -279,19 +303,28 @@ struct GameView: View {
             
             Divider()
             
+            // Auto-progress countdown
+            VStack(spacing: 8) {
+                Text("Retry in \(viewModel.autoProgressCountdown)s")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                ProgressView(value: Double(5 - viewModel.autoProgressCountdown), total: 5.0)
+                    .progressViewStyle(.linear)
+                    .tint(.orange)
+            }
+            .padding(.horizontal)
+            
             HStack(spacing: 20) {
-                Button("Retry") {
+                Button("Retry Now") {
+                    viewModel.saveScore(to: highScoreManager)
                     viewModel.restartCurrentLevel()
                 }
                 .buttonStyle(.borderedProminent)
                 
                 Button("Menu") {
-                    if highScoreManager.isHighScore(viewModel.stats.totalScore) {
-                        viewModel.shouldAdvanceAfterNameInput = false
-                        viewModel.showNameInput = true
-                    } else {
-                        viewModel.returnToMenu()
-                    }
+                    viewModel.saveScore(to: highScoreManager)
+                    viewModel.returnToMenu()
                 }
                 .buttonStyle(.bordered)
             }
