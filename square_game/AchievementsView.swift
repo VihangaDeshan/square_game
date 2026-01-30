@@ -110,7 +110,7 @@ struct AchievementCardView: View {
             // Icon
             ZStack {
                 Circle()
-                    .fill(achievement.isUnlocked ? iconColor.gradient : Color.gray.opacity(0.3))
+                    .fill(achievement.isUnlocked ? AnyShapeStyle(iconColor.gradient) : AnyShapeStyle(Color.gray.opacity(0.3)))
                     .frame(width: 70, height: 70)
                 
                 Image(systemName: achievement.icon)

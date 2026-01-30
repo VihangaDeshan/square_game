@@ -224,6 +224,13 @@ class GameViewModel: ObservableObject {
         }
     }
     
+    private func handleGameOver() {
+        stopTimer()
+        calculateScore()
+        gameState = .lost
+        startAutoProgressTimer()
+    }
+    
     private func handleTimeOut() {
         stopTimer()
         
