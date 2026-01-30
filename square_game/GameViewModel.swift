@@ -4,6 +4,7 @@ import Combine
 class GameViewModel: ObservableObject {
     // MARK: - Accessibility
     private let accessibility = AccessibilityManager.shared
+    private let analytics = AnalyticsManager.shared
     // MARK: - Published Properties
     @Published var cards: [Card] = []
     @Published var gameState: GameState = .menu
@@ -36,6 +37,12 @@ class GameViewModel: ObservableObject {
         levelConfig = LevelConfig(level: level, mode: mode)
         setupCards()
         stats.reset()
+        
+        // Track game start
+        analytics.trackGameStart(
+            level: level,
+            mode: levelConfig.mode.description
+        )
         
         if levelConfig.mode == .time || levelConfig.mode == .difficult {
             stats.timeRemaining = levelConfig.maxTime ?? 30
@@ -217,6 +224,16 @@ class GameViewModel: ObservableObject {
             calculateScore()
             gameState = .won
             
+            // Track level complete
+            analytics.trackLevelComplete(
+                level: stats.currentLevel,
+                mode: levelConfig.mode.description,
+                score: stats.totalScore,
+                turns: stats.turns,
+                timeRemaining: stats.timeRemaining,
+                isPerfect: perfectGameAchieved
+            )
+            
             // Accessibility feedback
             accessibility.playLevelCompleteSound()
             if perfectGameAchieved {
@@ -245,6 +262,14 @@ class GameViewModel: ObservableObject {
         stopTimer()
         calculateScore()
         gameState = .lost
+        
+        // Track level failed
+        analytics.trackLevelFailed(
+            level: stats.currentLevel,
+            mode: levelConfig.mode.description,
+            score: stats.totalScore,
+            reason: "exceeded_max_turns"
+        )
         
         accessibility.playErrorHaptic()
         accessibility.announce("Game over. Final score: \(stats.totalScore)")

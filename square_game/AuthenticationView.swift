@@ -5,6 +5,7 @@ import FirebaseAuth
 struct AuthenticationView: View {
     @EnvironmentObject var firebaseManager: FirebaseManager
     @EnvironmentObject var accessibilityManager: AccessibilityManager
+    @EnvironmentObject var analyticsManager: AnalyticsManager
     @State private var isLoginMode = true
     @State private var email = ""
     @State private var password = ""
@@ -165,6 +166,9 @@ struct AuthenticationView: View {
             do {
                 if isLoginMode {
                     try await firebaseManager.signIn(email: email, password: password)
+                    // Track login
+                    analyticsManager.trackLogin(method: "email", userId: firebaseManager.currentUser?.uid)
+                    analyticsManager.trackScreenView(screenName: "Main Menu", screenClass: "ContentView")
                 } else {
                     try await firebaseManager.registerUser(
                         email: email,
@@ -172,6 +176,10 @@ struct AuthenticationView: View {
                         username: username,
                         country: country
                     )
+                    // Track signup
+                    analyticsManager.trackSignUp(method: "email", userId: firebaseManager.currentUser?.uid)
+                    analyticsManager.updateUserProperties(country: country, level: 1, totalScore: 0)
+                    analyticsManager.trackScreenView(screenName: "Main Menu", screenClass: "ContentView")
                 }
                 await MainActor.run {
                     isLoading = false
@@ -185,6 +193,7 @@ struct AuthenticationView: View {
                     showError = true
                     accessibilityManager.playErrorHaptic()
                     accessibilityManager.announce("Error: \(error.localizedDescription)")
+                    analyticsManager.trackError(error: error, context: isLoginMode ? "login" : "signup")
                 }
             }
         }
